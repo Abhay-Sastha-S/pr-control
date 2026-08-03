@@ -125,7 +125,7 @@
 <div class="wrap">
 
   <div class="bar">
-    <b>PR Control</b><span>v1.0.0</span><span>MIT</span>
+    <b>PR Control</b><span>v1.1.0</span><span>MIT</span>
     <span class="push">
       <button type="button" id="themeBtn">Theme</button>
       <a href="https://github.com/Abhay-Sastha-S/pr-control">github ↗</a>
@@ -167,7 +167,7 @@
       <span><i style="background:var(--block)"></i>blocked behind someone else</span>
       <span><i style="background:var(--done)"></i>merged</span>
     </div>
-    <p class="cap">Illustrative — the real tree is built from your own PRs</p>
+    <p class="cap">Illustrative — the real tree is built from your own PRs, with independent chains in parallel tracks</p>
   </header>
 
   <section>
@@ -220,6 +220,27 @@
   </section>
 
   <section>
+    <h2>What the page gives you</h2>
+    <p>One self-contained HTML file, three ways to look at the same set of PRs:</p>
+    <div class="tw"><table>
+      <thead><tr><th>View</th><th>Answers</th></tr></thead>
+      <tbody>
+        <tr><td>Pipeline</td><td>Every PR in a column for its <em>real</em> state — first review, changes requested, approved-and-waiting-on-a-human, merged to dev — instead of GitHub's single green "Open".</td></tr>
+        <tr><td>Timeline replay</td><td>Scrub the last weeks and watch each PR open, collect its review ask, and land — so you can see where the time actually went.</td></tr>
+        <tr><td>Merge order</td><td>The dependency tree. Independent chains sit in separate <em>tracks</em> that run in parallel; within a track, PRs in the same <em>wave</em> can merge at once. Tick one merged and the wave it unlocks lights up.</td></tr>
+      </tbody>
+    </table></div>
+    <h3 style="margin-top:1.5rem">Merge Copilot</h3>
+    <p>A panel on the merge-order view that reads the whole graph — every dependency, who authored
+       what, what's blocked on whom. Ask it in plain words: <em>what can I merge now</em>,
+       <em>what's the critical path</em>, <em>who's waiting on me</em>,
+       <em>what's blocking web-app#99</em>. It answers from your own data rather than guessing,
+       jumps the tree to the PR it names, marks things merged as you go, and composes a review
+       ping for the channel. In keeping with the rule below, it <strong>drafts and deep-links —
+       it never sends Slack or merges anything.</strong> Those stay your call.</p>
+  </section>
+
+  <section>
     <h2>Nothing about your organisation is in the repo</h2>
     <div class="note">
       <p>Every organisation-specific value — your org, your GitHub login, your Slack workspace
@@ -239,7 +260,7 @@ $EDITOR ~/.claude/pr-control/config.json</pre>
     <p>Worth knowing before you run it, because the answer is "quite a lot":</p>
     <ul>
       <li><strong>GitHub</strong>, through the <code>gh</code> CLI you're already signed in to — PR metadata only, for the repos you list.</li>
-      <li><strong>Slack</strong>, read-only, through an MCP server — one channel, searched for review requests. The page never gets Slack <em>write</em> tools; replying is copy-to-clipboard plus a deep link into the thread.</li>
+      <li><strong>Slack</strong>, read-only, through an MCP server — one channel, searched for review requests. The page never gets Slack <em>write</em> tools; replying — including the copilot's drafted review pings — is copy-to-clipboard plus a deep link into the thread. Nothing is ever sent for you.</li>
       <li><strong>Linear</strong>, read-only — issue titles and statuses.</li>
       <li><strong><code>~/.claude/projects</code></strong>, read-only — your local Claude Code transcripts, scanned for PR URLs. Transcript content never leaves your machine; only the session id, project directory, and existing summary line are used.</li>
     </ul>
