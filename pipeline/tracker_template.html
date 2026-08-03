@@ -167,6 +167,38 @@ svg.wires{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index
 .mini.on{background:var(--merge-bg);border-color:var(--merge);color:var(--merge);font-weight:650}
 .gridflow{display:grid;grid-template-columns:repeat(auto-fill,214px);gap:14px}
 
+/* merge copilot */
+.cpfab{position:fixed;right:18px;bottom:18px;z-index:45;background:var(--acc);color:var(--acc-ink);border-radius:99px;padding:11px 16px;font-weight:650;font-size:13px;box-shadow:var(--shadow);border:none;cursor:pointer;display:none;align-items:center;gap:7px}
+.cpfab.show{display:inline-flex}
+.copilot{position:fixed;top:0;right:-420px;width:min(384px,96vw);height:100%;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:55;display:flex;flex-direction:column;transition:right .24s ease}
+.copilot.open{right:0}
+@media (prefers-reduced-motion:reduce){.copilot{transition:none}}
+.cphead{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px}
+.cphead .dot{width:8px;height:8px;border-radius:50%;background:var(--appr);flex:none;box-shadow:0 0 0 3px var(--appr-bg)}
+.cphead h3{margin:0;font-size:14px;font-weight:650}
+.cphead .sub{font-size:10px;color:var(--mut);margin-top:1px}
+.cpx{font-size:20px;color:var(--mut);cursor:pointer;background:none;border:none;padding:0 4px}
+.cplog{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px}
+.cpmsg{font-size:12.8px;line-height:1.5;max-width:93%;animation:pop .25s both}
+.cpmsg.u{align-self:flex-end;background:var(--acc);color:var(--acc-ink);border-radius:12px 12px 3px 12px;padding:7px 11px}
+.cpmsg.b{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:9px 12px}
+.cpmsg.b b{font-weight:650}
+.cpmsg .cpli{margin:4px 0;display:flex;gap:7px;align-items:baseline}
+.cpmsg .cpli .k{cursor:pointer;color:var(--acc);font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
+.cpmsg .cpli .k:hover{text-decoration:underline}
+.cpmsg .cpli .d{color:var(--mut);font-size:11.5px}
+.cpwho{font-size:10px;padding:1px 6px;border-radius:99px}
+.cpwho.you{background:var(--appr-bg);color:var(--appr)} .cpwho.them{background:var(--changes-bg);color:var(--changes)}
+.cpchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.cpchip{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;background:var(--panel);cursor:pointer;color:var(--ink)}
+.cpchip:hover{border-color:var(--acc);color:var(--acc)}
+.cpdraft{width:100%;min-height:74px;background:var(--panel);border:1px solid var(--line);border-radius:7px;color:var(--ink);font:inherit;font-size:12px;padding:8px;resize:vertical;margin-top:6px}
+.cpsug{padding:7px 13px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line)}
+.cpform{display:flex;gap:8px;padding:9px 12px 6px}
+.cpform input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;font-size:13px;padding:8px 11px}
+.cpform button{background:var(--acc);color:var(--acc-ink);border:none;border-radius:8px;padding:0 15px;font-weight:650;cursor:pointer}
+.cpnote{font-size:10px;color:var(--mut);padding:0 14px 10px;text-align:center;line-height:1.4}
+
 /* drawer */
 .ovl{position:fixed;inset:0;background:rgba(10,14,19,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
 .ovl.open{opacity:1;pointer-events:auto}
@@ -278,6 +310,14 @@ svg.wires{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index
 </div>
 
 <div class="ovl" id="ovl"></div>
+<button class="cpfab" id="cpFab" aria-label="Open merge copilot">✦ Copilot</button>
+<aside class="copilot" id="copilot" aria-label="Merge copilot">
+  <div class="cphead"><span class="dot"></span><div style="flex:1"><h3>Merge Copilot</h3><div class="sub" id="cpSub"></div></div><button class="cpx" id="cpClose" aria-label="Close">✕</button></div>
+  <div class="cplog" id="cpLog"></div>
+  <div class="cpsug" id="cpSug"></div>
+  <form class="cpform" id="cpForm"><input id="cpIn" placeholder="Ask about your merge order…" autocomplete="off" aria-label="Ask the copilot"><button type="submit">Ask</button></form>
+  <div class="cpnote" id="cpNote"></div>
+</aside>
 <aside class="drawer" id="drawer" aria-label="PR detail"><div class="dhead" id="dhead"></div><div class="dbody" id="dbody"></div></aside>
 
 <script>
@@ -759,6 +799,220 @@ $('#repoSel').innerHTML = '<option value="">All repos</option>' + repos.map(r=>`
 $('#repoSel').onchange = e => { state.repo = e.target.value; render(); };
 
 $('#stamp').innerHTML = `synced ${new Date(META.snapshot).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'})} IST · GitHub ${PRS.length} PRs · Linear ${META.linearCount} tickets<br><span class="live">●</span> Slack threads live via connector`;
+
+/* ---------- Merge Copilot — grounded assistant over the PR graph ---------- */
+(function(){
+  const mine = p => p.author === M.me;
+  const short = id => id.replace(ORGP,'');
+  const RV = M.reviewer || 'the reviewer';
+  let greeted = false;
+
+  function graph(){
+    const nodes = PRS.filter(p=>p.state==='OPEN');
+    const ids = new Set(nodes.map(p=>p.id));
+    const done = loadDone();
+    const preds={}, succs={}, sat={};
+    nodes.forEach(p=>{preds[p.id]=[];succs[p.id]=[];});
+    EDGES.forEach(e=>{
+      if(!ids.has(e.b)) return;
+      if(ids.has(e.a)){ preds[e.b].push(e); succs[e.a].push(e); }
+      else if(byId[e.a] && byId[e.a].state==='MERGED') (sat[e.b]=sat[e.b]||[]).push(e);
+    });
+    const isDone = id => done.has(id);
+    const ready = p => preds[p.id].every(e=>isDone(e.a));
+    const lvl={};
+    const L=(id,st)=>{ if(lvl[id]!=null) return lvl[id]; if(st.has(id)) return 0; st.add(id);
+      const ps=preds[id].map(e=>e.a); lvl[id]=ps.length?1+Math.max(...ps.map(x=>L(x,st))):0; st.delete(id); return lvl[id]; };
+    nodes.forEach(n=>L(n.id,new Set()));
+    return {nodes,preds,succs,sat,isDone,ready,lvl};
+  }
+
+  function findPRs(text){
+    const t=text.toLowerCase();
+    let m=t.match(/([a-z0-9._-]+)\s*#\s*(\d+)/);
+    if(m){ const r=m[1], n=+m[2];
+      const hit=PRS.find(p=>p.number===n && p.repo.toLowerCase().indexOf(r)>=0);
+      if(hit) return [hit];
+    }
+    m=t.match(/#\s*(\d+)/) || t.match(/\b(\d{2,4})\b/);
+    if(m){ const n=+m[1]; const hits=PRS.filter(p=>p.number===n); if(hits.length) return hits; }
+    const repos=[...new Set(PRS.map(p=>p.repo))];
+    const rp=repos.find(r=>t.indexOf(short(r).toLowerCase())>=0);
+    if(rp) return PRS.filter(p=>p.repo===rp);
+    return [];
+  }
+
+  function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+  function push(cls, html){ const log=$('#cpLog'); const m=el(`<div class="cpmsg ${cls}">${html}</div>`); log.appendChild(m); log.scrollTop=log.scrollHeight; return m; }
+  function line(pr, note){ return `<div class="cpli"><span class="k" data-show="${esc(pr.id)}">${esc(short(pr.id))}</span><span class="d">${esc(note||'')}</span></div>`; }
+  function actionChips(pr){
+    const s = mine(pr) ? `<span class="cpchip" data-draft="${esc(pr.id)}">Draft ${esc(RV)} ping</span>` : '';
+    return `<div class="cpchips"><span class="cpchip" data-show="${esc(pr.id)}">Show in tree</span><span class="cpchip" data-open="${esc(pr.id)}">Open detail</span>${s}<span class="cpchip" data-done="${esc(pr.id)}">Mark merged</span></div>`;
+  }
+  function statusText(pr){
+    const bits=[STATUS_LABEL[pr.status]||pr.status];
+    if(pr.waitingOn) bits.push('waiting on '+pr.waitingOn.replace(/^[A-Za-z ]+— /,''));
+    return bits.join(' · ');
+  }
+  function sugRow(list){ return `<div class="cpchips">`+list.map(s=>`<span class="cpchip" data-ask="${esc(s)}">${esc(s)}</span>`).join('')+`</div>`; }
+
+  function reply(text){
+    const t=text.toLowerCase().trim();
+    if(!t) return;
+    const g=graph();
+    const readyNow=g.nodes.filter(p=>!g.isDone(p.id)&&g.ready(p));
+    if(/^(help|commands|\?|what can you do)/.test(t)) return help();
+    if(/\b(draft|ping|text|message|notify|nudge)\b/.test(t)){
+      const prs=findPRs(t); if(!prs.length) return push('b', `Which PR should I draft a ${esc(RV)} ping for? e.g. <b>draft review for ${esc(short((PRS.find(mine)||{id:'repo#123'}).id))}</b>.`);
+      return draft(prs[0]);
+    }
+    if(/\b(mark|done|merged|landed)\b/.test(t)){
+      const prs=findPRs(t); if(!prs.length) return push('b','Which PR did you merge? e.g. <b>mark benji#66 merged</b>.');
+      return markDone(prs[0]);
+    }
+    if(/\breset\b/.test(t)){ saveDone(new Set()); renderQueue(); return push('b','Cleared your merged-progress — the tree is back to the full open set.'); }
+    if(/\b(now|parallel|unblocked)\b/.test(t) || /(what|which).*(merge|do|start)/.test(t)) return showNow(g, readyNow);
+    if(/\bnext\b/.test(t)){
+      const pick=readyNow.filter(mine).sort((a,b)=>RANK(a.repo)-RANK(b.repo)||(a.createdAt||'').localeCompare(b.createdAt||''))[0] || readyNow[0];
+      if(!pick) return push('b','Nothing is unblocked right now — everything open is waiting on something above it.');
+      return push('b', `Your next move: ${line(pick, statusText(pick))}${actionChips(pick)}`);
+    }
+    if(/\b(critical|longest|bottleneck|deepest|chain)\b/.test(t)) return criticalPath(g);
+    if(/(waiting on me|unblock|who needs|depend on me|blocking others|others wait)/.test(t)) return whoWaits(g);
+    if(/(blocked by|stuck|behind|someone else|others block)/.test(t) && !findPRs(t).length) return stuck(g);
+    if(/(block|why|locked|waiting|gate|before)/.test(t) && findPRs(t).length) return blockersOf(g, findPRs(t)[0]);
+    if(/(session|resume|local|transcript|chat)/.test(t) && findPRs(t).length) return sessions(findPRs(t)[0]);
+    const prs=findPRs(t);
+    if(prs.length===1) return prStatus(pr0(prs));
+    if(prs.length>1) return push('b', `${prs.length} open PRs match:`+prs.map(p=>line(p,(mine(p)?'yours':p.author)+' · '+statusText(p))).join(''));
+    return push('b', `I didn't catch a PR or command there. I know your whole graph — try:`+sugRow(['what can I merge now','critical path','who\'s waiting on me','blocked by others']));
+  }
+  function pr0(prs){ return prs[0]; }
+
+  function showNow(g, readyNow){
+    if(!readyNow.length) return push('b','Nothing is unblocked right now. Tick something <b>merged</b> and the next wave lights up.');
+    const yours=readyNow.filter(mine), theirs=readyNow.filter(p=>!mine(p));
+    let h=`<b>${readyNow.length} mergeable in parallel right now</b> — independent tracks, so these can all go at once:`;
+    h+=yours.map(p=>line(p,'yours · '+statusText(p))).join('');
+    if(theirs.length){ h+=`<div class="d" style="margin-top:6px;color:var(--mut)">Ready but not yours — nudge the author:</div>`+theirs.map(p=>line(p,p.author)).join(''); }
+    push('b', h);
+    if(yours[0]) push('b', `Start with ${line(yours[0])}${actionChips(yours[0])}`);
+  }
+  function criticalPath(g){
+    let end=null,best=-1; g.nodes.forEach(p=>{ if(!g.isDone(p.id)&&g.lvl[p.id]>best){best=g.lvl[p.id];end=p;} });
+    if(!end||best===0) return push('b','No open dependency chains deeper than one — most of your PRs can merge independently. Ask <b>what can I merge now</b>.');
+    const chain=[]; let cur=end, guard=0;
+    while(cur&&guard++<24){ chain.unshift(cur); const ps=g.preds[cur.id].map(e=>byId[e.a]).filter(Boolean); cur=ps.sort((a,b)=>g.lvl[b.id]-g.lvl[a.id])[0]; }
+    push('b', `<b>Longest chain — ${chain.length} deep.</b> This is the bottleneck; start the top of it first:`+chain.map((p,i)=>line(p,(i===0?'← start here · ':'')+(mine(p)?'yours':p.author))).join(''));
+  }
+  function whoWaits(g){
+    const rows=[];
+    g.nodes.filter(mine).forEach(p=>g.succs[p.id].filter(e=>!mine(byId[e.b])).forEach(e=>
+      rows.push(`<div class="cpli"><span class="k" data-show="${esc(p.id)}">${esc(short(p.id))}</span><span class="d">unblocks ${esc(byId[e.b].author)}'s ${esc(short(e.b))}</span></div>`)));
+    if(!rows.length) return push('b','Nothing of yours is blocking someone else right now.');
+    push('b', `<b>Yours that others are waiting on</b> — landing these clears their path:`+rows.join(''));
+  }
+  function stuck(g){
+    const rows=[];
+    g.nodes.filter(mine).filter(p=>!g.isDone(p.id)).forEach(p=>g.preds[p.id].filter(e=>!g.isDone(e.a)&&!mine(byId[e.a])).forEach(e=>
+      rows.push(`<div class="cpli"><span class="k" data-show="${esc(p.id)}">${esc(short(p.id))}</span><span class="d">⛔ behind ${esc(byId[e.a].author)}'s ${esc(short(e.a))} (${esc(ETYPE[e.type]||e.type)})</span></div>`)));
+    if(!rows.length) return push('b','None of yours are blocked behind someone else — the only thing between you and merging is review/approval.');
+    push('b', `<b>Yours blocked behind other people</b> — these can't go until theirs land:`+rows.join(''));
+  }
+  function blockersOf(g, pr){
+    if(g.isDone(pr.id)) return push('b', line(pr,'you\'ve marked this merged.'));
+    const open=g.preds[pr.id].filter(e=>!g.isDone(e.a));
+    if(!open.length){ const s=g.sat[pr.id]||[]; return push('b', `<b>${esc(short(pr.id))} is unblocked</b> — nothing ahead of it${s.length?' (prereq '+esc(short(s[0].a))+' already merged)':''}. ${esc(statusText(pr))}.`+actionChips(pr)); }
+    push('b', `<b>${esc(short(pr.id))} is waiting on ${open.length}:</b>`+open.map(e=>{
+      const a=byId[e.a], gate=e.owner?` · 🚀 then deploy (${esc(e.owner)})`:'';
+      return `<div class="cpli"><span class="k" data-show="${esc(a.id)}">${esc(short(a.id))}</span><span class="d">${mine(a)?'yours':esc(a.author)+"'s"} · ${esc(ETYPE[e.type]||e.type)}${e.note?' — '+esc(e.note):''}${gate}</span></div>`;
+    }).join(''));
+  }
+  function prStatus(pr){
+    const tix=(pr.tickets||[]).map(t=>t.id+(t.status?' ('+t.status+')':'')).join(', ');
+    const asks=(pr.slack||[]).length, ns=(pr.sessions||[]).length;
+    let h=`<b>${esc(short(pr.id))}</b> <span class="cpwho ${mine(pr)?'you':'them'}">${mine(pr)?'yours':esc(pr.author)}</span><br>${esc(pr.title)}<br><span class="d" style="color:var(--mut)">${esc(statusText(pr))}</span>`;
+    if(tix) h+=`<br><span class="d" style="color:var(--mut)">Linear: ${esc(tix)}</span>`;
+    h+=`<br><span class="d" style="color:var(--mut)">${asks?asks+' review ask'+(asks>1?'s':'')+' in #'+esc(M.channelName||'channel'):'never posted to #'+esc(M.channelName||'channel')} · ${ns} local session${ns===1?'':'s'}</span>`;
+    push('b', h+actionChips(pr));
+  }
+  function sessions(pr){
+    if(!(pr.sessions||[]).length) return push('b', `No local Claude session touched ${esc(short(pr.id))}.`);
+    push('b', `<b>Resume the work on ${esc(short(pr.id))}:</b>`+pr.sessions.map(s=>`<div class="cpli"><span class="k" data-copy="${esc(s.resume)}">${esc(s.summary||'session')}</span><span class="d">click to copy resume cmd</span></div>`).join(''));
+  }
+  function draft(pr){
+    const tix=(pr.tickets||[]).length?' ('+pr.tickets.map(t=>t.id).join(', ')+')':'';
+    const msg=`${RV} review and approve please\n${pr.url}${tix}`;
+    const lastExact=[...(pr.slack||[])].reverse().find(m=>m.exact);
+    const link=lastExact?lastExact.link:M.channelLink;
+    const where=lastExact?'the existing thread':'#'+(M.channelName||'the review channel');
+    const m=push('b', `A review ping for <b>${esc(short(pr.id))}</b>. I won't send it — copy it and it opens ${esc(where)} for you to post:`
+      +`<textarea class="cpdraft" id="cpDraft">${esc(msg)}</textarea>`
+      +`<div class="cpchips"><span class="cpchip" data-copyopen="1">Copy &amp; open Slack</span><span class="cpchip" data-open="${esc(pr.id)}">See PR detail</span></div>`);
+    m.querySelector('[data-copyopen]').addEventListener('click', ()=>{
+      const val=m.querySelector('#cpDraft').value, go=()=>window.open(link,'_blank','noopener');
+      (navigator.clipboard?navigator.clipboard.writeText(val):Promise.reject()).then(go,go);
+    });
+  }
+  function markDone(pr){
+    const s=loadDone(); const was=s.has(pr.id);
+    was?s.delete(pr.id):s.add(pr.id); saveDone(s); renderQueue();
+    const g=graph();
+    const freed=g.nodes.filter(p=>!g.isDone(p.id)&&g.ready(p)&&g.preds[p.id].some(e=>e.a===pr.id));
+    let h=was?`Un-marked ${esc(short(pr.id))} — back in the open set.`:`Marked <b>${esc(short(pr.id))}</b> merged.`;
+    if(!was&&freed.length) h+=` That unlocks: `+freed.map(p=>esc(short(p.id))).join(', ')+'.';
+    push('b', h);
+    if(!was) freed.forEach(highlight);
+  }
+  function highlight(pr){
+    const id=typeof pr==='string'?pr:pr.id;
+    if(state.view!=='queue') setTab('queue');
+    requestAnimationFrame(()=>setTimeout(()=>{
+      const sel=(window.CSS&&CSS.escape)?CSS.escape(id):id.replace(/["\\#/]/g,'\\$&');
+      const n=document.querySelector(`.tnode[data-node="${sel}"]`); if(!n) return;
+      n.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+      n.classList.add('pulse'); setTimeout(()=>n.classList.remove('pulse'),1400);
+    },120));
+  }
+  function help(){
+    push('b', `I read your synced PR graph — every dependency, who authored what, what's blocked. Ask me things like:`
+      +sugRow(['what can I merge now','what\'s next','critical path','who\'s waiting on me','blocked by others','mark a PR merged']));
+  }
+  function greet(){
+    if(greeted) return; greeted=true;
+    const g=graph();
+    const readyNow=g.nodes.filter(p=>!g.isDone(p.id)&&g.ready(p));
+    const yours=readyNow.filter(mine).length;
+    const stuckN=g.nodes.filter(mine).filter(p=>!g.isDone(p.id)&&g.preds[p.id].some(e=>!g.isDone(e.a)&&!mine(byId[e.a]))).length;
+    const waitN=g.nodes.filter(mine).filter(p=>g.succs[p.id].some(e=>!mine(byId[e.b]))).length;
+    push('b', `Hi — I'm your merge copilot for these ${g.nodes.length} open PRs. <b>${readyNow.length} can merge in parallel right now</b>${yours?` (${yours} yours)`:''}.`
+      +(stuckN?` <b>${stuckN}</b> of yours ${stuckN>1?'are':'is'} blocked behind someone else.`:'')
+      +(waitN?` ${waitN} of yours ${waitN>1?'unblock':'unblocks'} other people.`:''));
+    help();
+  }
+
+  function ask(text){ push('u', esc(text)); reply(text); }
+  $('#cpLog').addEventListener('click', ev=>{
+    const t=ev.target.closest('[data-show],[data-open],[data-done],[data-draft],[data-ask],[data-copy]'); if(!t) return;
+    if(t.dataset.show) highlight(t.dataset.show);
+    else if(t.dataset.open) openDrawer(t.dataset.open);
+    else if(t.dataset.done){ const pr=byId[t.dataset.done]; if(pr) markDone(pr); }
+    else if(t.dataset.draft){ const pr=byId[t.dataset.draft]; if(pr) draft(pr); }
+    else if(t.dataset.ask) ask(t.dataset.ask);
+    else if(t.dataset.copy){ if(navigator.clipboard) navigator.clipboard.writeText(t.dataset.copy); t.textContent='copied ✓'; }
+  });
+  $('#cpSug').addEventListener('click', ev=>{ const c=ev.target.closest('[data-ask]'); if(c) ask(c.dataset.ask); });
+  $('#cpForm').addEventListener('submit', ev=>{ ev.preventDefault(); const v=$('#cpIn').value.trim(); if(!v) return; $('#cpIn').value=''; ask(v); });
+  function openCP(){ $('#copilot').classList.add('open'); greet(); $('#cpIn').focus(); }
+  $('#cpFab').addEventListener('click', openCP);
+  $('#cpClose').addEventListener('click', ()=>$('#copilot').classList.remove('open'));
+  addEventListener('keydown', e=>{ if(e.key==='Escape') $('#copilot').classList.remove('open'); });
+
+  $('#cpSub').textContent = `${PRS.filter(p=>p.state==='OPEN').length} open · grounded in your graph`;
+  $('#cpSug').innerHTML = ['what can I merge now','critical path','who\'s waiting on me'].map(s=>`<span class="cpchip" data-ask="${esc(s)}">${esc(s)}</span>`).join('');
+  $('#cpNote').innerHTML = `Reasons over your synced data and drafts messages — it never sends Slack or merges anything. That stays your call.`;
+  const _render=render; render=function(){ _render(); $('#cpFab').classList.toggle('show', state.view==='queue'); };
+})();
 
 render();
 </script>

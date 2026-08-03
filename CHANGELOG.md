@@ -9,6 +9,26 @@ versioning is [semantic](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-03
+
+### Added
+
+- **Merge Copilot** — a grounded assistant panel on the merge-order view. It
+  reads the built PR graph (dependencies, authorship, block state) and answers
+  in plain language: what's mergeable in parallel right now, the critical path,
+  who is waiting on you, what is blocking a given PR, and per-PR status. It
+  drives the tree — jumping to and pulsing the PR it names, and marking PRs
+  merged so the unlocked wave lights up — and composes a review ping for the
+  channel. Honouring the read-only-Slack rule, it **drafts and deep-links; it
+  never sends Slack or merges anything.** Runs entirely client-side over the
+  data already in the page, so it works on the published page with no backend.
+
+### Changed
+
+- Landing page documents the three views (Pipeline, Timeline replay, Merge
+  order) and the Merge Copilot, and clarifies that copilot drafts follow the
+  same copy-and-deep-link path as every other Slack reply.
+
 ## [1.0.0] — 2026-08-03
 
 First public release.
