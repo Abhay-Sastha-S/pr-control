@@ -1,0 +1,48 @@
+{
+  "github": {
+    "owner": "your-org",
+    "me": "your-github-login",
+    "repos": ["backend", "web-app", "shared-lib"],
+    "prLimit": 15
+  },
+
+  "slack": {
+    "workspace": "your-workspace.slack.com",
+    "channelId": "C0000000000",
+    "channelName": "code-review",
+    "meDisplayName": "Your Name",
+    "reviewerLabel": "the reviewer",
+    "searchPhrase": "review and approve"
+  },
+
+  "linear": {
+    "workspace": "your-linear-workspace",
+    "ticketPrefix": "ABC"
+  },
+
+  "window": {
+    "start": "2026-07-01"
+  },
+
+  "_comment_serviceRank": "Lower merges first. Libraries 0, services 1 (the default), user-facing apps 2.",
+  "serviceRank": {
+    "your-org/shared-lib": 0,
+    "your-org/web-app": 2
+  },
+
+  "_comment_deps": "Ordering that no API knows about — usually stated in the review channel. kind 'order' means merge and deploy left to right; kind 'companion' means ship together.",
+  "deps": [
+    {
+      "kind": "order",
+      "chain": ["your-org/backend#209", "your-org/web-app#99"],
+      "note": "Merge and deploy the backend first or the new page 404s",
+      "ticket": "ABC-1169",
+      "owner": "backend deploy"
+    },
+    {
+      "kind": "companion",
+      "chain": ["your-org/backend#217", "your-org/web-app#105"],
+      "ticket": "ABC-1245"
+    }
+  ]
+}

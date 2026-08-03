@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Control — the merge order GitHub can't tell you</title>
+<meta name="description" content="One page for every pull request you have in flight, cross-referencing GitHub, your review channel, tickets, and local Claude Code sessions — and computing the order they have to merge in.">
+<style>
+  :root {
+    --paper:#F5F4F1; --surface:#FFFFFF; --sunken:#EBE9E4; --ink:#181713;
+    --muted:#57544C; --faint:#847F74; --line:#DAD7D0; --rule:#C9C5BB;
+    --accent:#1F5E4A;          /* deep pine — the "ready" signal */
+    --gate:#9A5B12;            /* ochre — gated on someone else */
+    --block:#93321F;           /* rust — blocked */
+    --done:#6B7668;            /* moss — merged */
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#14150F; --surface:#1C1D16; --sunken:#101109; --ink:#EDEBE2;
+      --muted:#A8A498; --faint:#7C786C; --line:#2C2E23; --rule:#3A3C2F;
+      --accent:#6FC5A3; --gate:#E0A54E; --block:#F08A6E; --done:#8FA08B;
+    }
+  }
+  :root[data-theme="dark"]{--paper:#14150F;--surface:#1C1D16;--sunken:#101109;--ink:#EDEBE2;
+    --muted:#A8A498;--faint:#7C786C;--line:#2C2E23;--rule:#3A3C2F;
+    --accent:#6FC5A3;--gate:#E0A54E;--block:#F08A6E;--done:#8FA08B;}
+  :root[data-theme="light"]{--paper:#F5F4F1;--surface:#FFFFFF;--sunken:#EBE9E4;--ink:#181713;
+    --muted:#57544C;--faint:#847F74;--line:#DAD7D0;--rule:#C9C5BB;
+    --accent:#1F5E4A;--gate:#9A5B12;--block:#93321F;--done:#6B7668;}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule)}
+  a:hover{border-bottom-color:var(--accent);color:var(--accent)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .wrap{max-width:940px;margin:0 auto;padding:0 clamp(1rem,4vw,2rem) 5rem}
+
+  .bar{display:flex;align-items:center;gap:1rem;padding:0.8rem 0;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:0.71rem;letter-spacing:0.11em;text-transform:uppercase;color:var(--faint)}
+  .bar b{color:var(--ink);letter-spacing:0.15em}
+  .bar .push{margin-left:auto;display:flex;gap:1rem;align-items:center}
+  .bar a{border:0}
+  #themeBtn{font:inherit;font-size:0.71rem;letter-spacing:0.11em;text-transform:uppercase;
+    background:none;border:1px solid var(--line);color:var(--muted);padding:0.2rem 0.6rem;cursor:pointer}
+  #themeBtn:hover{color:var(--accent);border-color:var(--accent)}
+
+  header.hero{padding:clamp(2.6rem,6vw,4.6rem) 0 clamp(1.8rem,4vw,2.8rem)}
+  .kicker{font-family:var(--mono);font-size:0.71rem;letter-spacing:0.16em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:1.3rem}
+  h1{font-size:clamp(1.9rem,1.2rem+2.4vw,3rem);line-height:1.05;letter-spacing:-0.03em;
+    font-weight:600;margin:0 0 1.1rem;text-wrap:balance;max-width:26ch}
+  h1 i{font-style:italic;font-weight:400;color:var(--accent)}
+  .lede{font-size:1.07rem;color:var(--muted);max-width:58ch;margin:0 0 1.7rem}
+  .cmd{display:inline-flex;align-items:stretch;border:1px solid var(--line);background:var(--surface);max-width:100%}
+  .cmd code{font-family:var(--mono);font-size:0.78rem;padding:0.72rem 0.9rem;white-space:nowrap;
+    overflow-x:auto;color:var(--ink)}
+  .cmd button{font:inherit;font-family:var(--mono);font-size:0.66rem;letter-spacing:0.1em;
+    text-transform:uppercase;border:0;border-left:1px solid var(--line);background:var(--sunken);
+    color:var(--muted);padding:0 0.9rem;cursor:pointer}
+  .cmd button:hover{color:var(--accent)}
+
+  /* --- the merge tree: the thing the tool is actually for --- */
+  .tree{border:1px solid var(--line);background:var(--surface);padding:1.3rem 1.2rem;margin:2.2rem 0 0.7rem}
+  .tier{display:flex;gap:0.55rem;flex-wrap:wrap;align-items:stretch;margin-bottom:0.55rem}
+  .tier:last-child{margin-bottom:0}
+  .tier-l{font-family:var(--mono);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--faint);width:5.2rem;flex:none;padding-top:0.45rem}
+  .node{border:1px solid var(--line);border-left-width:2px;background:var(--paper);
+    padding:0.4rem 0.6rem;font-family:var(--mono);font-size:0.73rem;line-height:1.35}
+  .node b{font-weight:600;display:block}
+  .node span{color:var(--faint);font-size:0.68rem}
+  .node.ready{border-left-color:var(--accent)}
+  .node.gate{border-left-color:var(--gate)}
+  .node.block{border-left-color:var(--block)}
+  .node.done{border-left-color:var(--done);opacity:0.62}
+  .legend{display:flex;flex-wrap:wrap;gap:0.4rem 1.1rem;font-family:var(--mono);font-size:0.66rem;
+    color:var(--faint);margin-bottom:2.6rem}
+  .legend i{display:inline-block;width:0.55rem;height:0.55rem;margin-right:0.35rem;vertical-align:baseline}
+  .cap{font-family:var(--mono);font-size:0.64rem;letter-spacing:0.06em;text-transform:uppercase;
+    color:var(--faint);margin:0.55rem 0 0}
+
+  section{padding:clamp(2.2rem,4.5vw,3.4rem) 0;border-top:1px solid var(--line)}
+  h2{font-size:clamp(1.2rem,0.95rem+0.9vw,1.55rem);letter-spacing:-0.02em;font-weight:600;
+    margin:0 0 1.3rem;text-wrap:balance;max-width:34ch}
+  h3{font-size:0.97rem;font-weight:600;margin:0 0 0.3rem}
+  p{margin:0 0 1rem;color:var(--muted);max-width:70ch}
+  p.plain{color:var(--ink)}
+  p:last-child{margin-bottom:0}
+  strong{color:var(--ink);font-weight:600}
+  em{font-style:italic}
+  code{font-family:var(--mono);font-size:0.85em;background:var(--sunken);padding:0.05em 0.3em;
+    border:1px solid var(--line)}
+
+  .qs{display:grid;gap:1.15rem;margin-bottom:1.5rem}
+  .q{border-left:2px solid var(--rule);padding-left:1rem}
+  .q p{margin:0.2rem 0 0}
+
+  .tw{overflow-x:auto;border:1px solid var(--line);background:var(--surface);margin-bottom:1.1rem}
+  table{border-collapse:collapse;width:100%;min-width:32rem;font-size:0.88rem}
+  th,td{text-align:left;padding:0.6rem 0.9rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:0.64rem;letter-spacing:0.11em;text-transform:uppercase;
+    color:var(--faint);font-weight:500;background:var(--sunken)}
+  tbody tr:last-child td{border-bottom:0}
+  td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
+  td:not(:first-child){color:var(--muted)}
+
+  pre{font-family:var(--mono);font-size:0.78rem;line-height:1.6;background:var(--surface);
+    border:1px solid var(--line);padding:1rem 1.05rem;overflow-x:auto;margin:0 0 1.1rem}
+  pre .c{color:var(--faint)}
+  ul{margin:0 0 1rem;padding-left:1.15rem;color:var(--muted)}
+  li{margin-bottom:0.42rem}
+  li:last-child{margin-bottom:0}
+  .note{border:1px solid var(--line);border-left:2px solid var(--accent);background:var(--surface);
+    padding:1rem 1.15rem;margin-bottom:1.2rem}
+  .note p{margin-bottom:0}
+  footer{border-top:1px solid var(--line);padding-top:1.3rem;margin-top:2rem;
+    font-family:var(--mono);font-size:0.69rem;color:var(--faint);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <b>PR Control</b><span>v1.0.0</span><span>MIT</span>
+    <span class="push">
+      <button type="button" id="themeBtn">Theme</button>
+      <a href="https://github.com/Abhay-Sastha-S/pr-control">github ↗</a>
+    </span>
+  </div>
+
+  <header class="hero">
+    <div class="kicker">Claude Code plugin</div>
+    <h1>"Open" is not a status. <i>Which one do I merge first?</i></h1>
+    <p class="lede">
+      One page for every pull request you have in flight — joining GitHub, the review
+      channel that asked for review, the tickets they close, and the local Claude Code
+      sessions that wrote them. Then it works out the order they actually have to land in.
+    </p>
+    <div class="cmd">
+      <code id="cmdText">/plugin marketplace add Abhay-Sastha-S/pr-control</code>
+      <button type="button" id="copyBtn">Copy</button>
+    </div>
+
+    <div class="tree" aria-label="Example merge-order tree">
+      <div class="tier">
+        <div class="tier-l">merge now</div>
+        <div class="node ready"><b>shared-lib#412</b><span>approved · nothing ahead of it</span></div>
+        <div class="node ready"><b>backend#209</b><span>approved · waiting on a human</span></div>
+      </div>
+      <div class="tier">
+        <div class="tier-l">then</div>
+        <div class="node gate"><b>web-app#99</b><span>🚀 needs backend#209 deployed</span></div>
+        <div class="node block"><b>backend#217</b><span>⛔ behind a colleague's #214</span></div>
+      </div>
+      <div class="tier">
+        <div class="tier-l">landed</div>
+        <div class="node done"><b>backend#212</b><span>✓ merged — on dev</span></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>ready</span>
+      <span><i style="background:var(--gate)"></i>gated on a deploy</span>
+      <span><i style="background:var(--block)"></i>blocked behind someone else</span>
+      <span><i style="background:var(--done)"></i>merged</span>
+    </div>
+    <p class="cap">Illustrative — the real tree is built from your own PRs</p>
+  </header>
+
+  <section>
+    <h2>Why it exists</h2>
+    <div class="qs">
+      <div class="q">
+        <h3>"Open" collapses four different situations into one word.</h3>
+        <p>Waiting for a first review, waiting on requested changes, approved and waiting for
+           a human to press merge, and blocked behind someone else's deploy are completely
+           different problems — and only one of them is your move. GitHub shows all four as
+           a green "Open".</p>
+      </div>
+      <div class="q">
+        <h3>The merge order lives where no API can see it.</h3>
+        <p>A sentence in a Slack thread — <em>"merge the backend one first or the page 404s"</em> —
+           two PRs closing the same ticket, a pair of stacked branches. Get the order wrong and
+           you spend the afternoon rebasing.</p>
+      </div>
+      <div class="q">
+        <h3>A PR nobody was told about isn't in review.</h3>
+        <p>It's just open. That gap is invisible on GitHub, where the PR looks perfectly healthy.</p>
+      </div>
+      <div class="q">
+        <h3>The reasoning is in a session you can't name.</h3>
+        <p>Why you made a call four days ago is in a Claude Code transcript identified by a UUID.
+           Each PR here links to the sessions that touched it, with a ready-to-paste
+           <code>claude --resume</code>.</p>
+      </div>
+    </div>
+    <p class="plain">Every one of those answers already exists. They're just in four tools that
+       don't join to each other. This does the join.</p>
+  </section>
+
+  <section>
+    <h2>What it computes that nothing else does</h2>
+    <p>The heart of it is the edge set — <em>a must merge before b</em> — derived in precedence order:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Source</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Channel-stated chains</td><td>Someone said so in the review channel. Highest authority, and hand-maintained in config because no API exposes it.</td></tr>
+        <tr><td>Branch stacks</td><td><code>b</code>'s base branch is <code>a</code>'s head. Structural, so it's inferred.</td></tr>
+        <tr><td>Shared open tickets</td><td>Two open PRs closing the same ticket ship together.</td></tr>
+        <tr><td>Same-repo ordering</td><td>Older open PRs in a repo where you have one merge first, or you rebase.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Ties break on a configurable service rank — shared libraries before services, services
+       before user-facing apps. Other people's PRs are pulled in <strong>only</strong> when they
+       share an edge with one of yours, so the page stays about your work while still showing
+       who you're waiting on.</p>
+  </section>
+
+  <section>
+    <h2>Nothing about your organisation is in the repo</h2>
+    <div class="note">
+      <p>Every organisation-specific value — your org, your GitHub login, your Slack workspace
+         and channel, your teammates, your Linear workspace, your dependency chains — lives in
+         one config file that is <strong>never committed</strong>. The release check fails the
+         build if a config file, a Slack export, or a built page is ever staged, so the repo
+         can't start leaking by accident.</p>
+    </div>
+<pre>cp config.example.json ~/.claude/pr-control/config.json
+$EDITOR ~/.claude/pr-control/config.json</pre>
+    <p>The page template holds no organisation strings either — it labels itself at runtime from
+       a <code>meta</code> block the build injects.</p>
+  </section>
+
+  <section>
+    <h2>What it reads</h2>
+    <p>Worth knowing before you run it, because the answer is "quite a lot":</p>
+    <ul>
+      <li><strong>GitHub</strong>, through the <code>gh</code> CLI you're already signed in to — PR metadata only, for the repos you list.</li>
+      <li><strong>Slack</strong>, read-only, through an MCP server — one channel, searched for review requests. The page never gets Slack <em>write</em> tools; replying is copy-to-clipboard plus a deep link into the thread.</li>
+      <li><strong>Linear</strong>, read-only — issue titles and statuses.</li>
+      <li><strong><code>~/.claude/projects</code></strong>, read-only — your local Claude Code transcripts, scanned for PR URLs. Transcript content never leaves your machine; only the session id, project directory, and existing summary line are used.</li>
+    </ul>
+    <p>Everything runs locally. The only thing that goes anywhere is the finished page, and only when you publish it.</p>
+  </section>
+
+  <section>
+    <h2>The pipeline</h2>
+<pre>gh pr list ─────────────► prs.jsonl ──┐
+slack search ──► slack_mentions.json ─┤
+linear issues ─► linear_issues.json ──┼──► merge.py ──► prdata.json
+extract_sessions.py ──► sessions.json ┤                      │
+gh pr list (bodies) ──► tickets.jsonl ┘                      ▼
+                                              build_page.py ──► pr-control.html
+                                                                     │
+                                            scripts/smoke-page.mjs ──┴──► publish</pre>
+    <p><strong>That last step earns its place.</strong> The page is one large inline script, and a
+       syntax check only proves it parses — a <code>const</code> used before its declaration parses
+       perfectly and then renders a blank page. The smoke test executes the built page against a
+       DOM shim and fails on load-time errors. It caught exactly that bug while this was being
+       packaged.</p>
+  </section>
+
+  <section>
+    <h2>Credits</h2>
+    <ul>
+      <li><strong><a href="https://claude.com/claude-code">Claude Code</a></strong>, by <a href="https://www.anthropic.com/">Anthropic</a> — the sessions column reads its local transcript format, and the skill drives the refresh.</li>
+      <li><strong><a href="https://cli.github.com/">GitHub CLI</a></strong> — every PR fact comes from it.</li>
+      <li><strong><a href="https://slack.com/">Slack</a></strong> and <strong><a href="https://linear.app/">Linear</a></strong> — read through their MCP servers; both are their companies' products and this only reads from them.</li>
+      <li><strong><a href="https://jqlang.github.io/jq/">jq</a></strong> — shapes the <code>gh</code> output.</li>
+      <li><strong>No runtime dependencies</strong> — Python standard library and one inline HTML page. Nothing bundled or vendored.</li>
+      <li><strong>Written with</strong> <a href="https://claude.com/claude-code">Claude Code</a>, co-author on the commits that built this.</li>
+    </ul>
+    <p>Claude, Claude Code, and Anthropic are trademarks of Anthropic; GitHub, Slack, and Linear
+       are trademarks of their respective owners. This project is <strong>unofficial</strong> and
+       is not affiliated with, endorsed by, or supported by any of them.</p>
+  </section>
+
+  <footer>
+    <span>MIT licensed</span>
+    <span><a href="https://github.com/Abhay-Sastha-S/pr-control">github.com/Abhay-Sastha-S/pr-control</a></span>
+    <span>Unofficial — not affiliated with Anthropic, GitHub, Slack, or Linear</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  var saved = null;
+  try { saved = localStorage.getItem('prc-theme'); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+  btn.addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('prc-theme', next); } catch (e) {}
+  });
+
+  var copy = document.getElementById('copyBtn');
+  copy.addEventListener('click', function () {
+    navigator.clipboard.writeText(document.getElementById('cmdText').textContent).then(function () {
+      copy.textContent = 'Copied';
+      setTimeout(function () { copy.textContent = 'Copy'; }, 1600);
+    }).catch(function () {
+      copy.textContent = 'Press ⌘C';
+      setTimeout(function () { copy.textContent = 'Copy'; }, 1600);
+    });
+  });
+})();
+</script>
+</body>
+</html>

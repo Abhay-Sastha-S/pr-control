@@ -1,0 +1,14 @@
+# Never commit anything organisation-specific or pipeline-generated.
+config.json
+slack_mentions.json
+linear_issues.json
+sessions.json
+prdata.json
+*.jsonl
+pr-control.html
+.DS_Store
+__pycache__/
+*.pyc
+
+# Synthetic fixtures use placeholder values only and are meant to be tracked.
+!tests/fixtures/**

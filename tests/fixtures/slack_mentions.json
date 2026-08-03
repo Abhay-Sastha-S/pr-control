@@ -1,0 +1,1 @@
+{"channel_id": "C0000000000", "channel_name": "code-review", "workspace": "your-workspace.slack.com", "mentions": [{"ts": "1785000000.000100", "who": "Your Name", "prs": ["your-org/backend#209"]}], "channel_only_mentions": [{"who": "Your Name", "date": "2026-07-30", "prs": ["your-org/backend#217"]}]}
