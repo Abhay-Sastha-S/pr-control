@@ -28,6 +28,11 @@ versioning is [semantic](https://semver.org/spec/v2.0.0.html).
 - Landing page documents the three views (Pipeline, Timeline replay, Merge
   order) and the Merge Copilot, and clarifies that copilot drafts follow the
   same copy-and-deep-link path as every other Slack reply.
+- Landing page rebuilt on the shared mono-display chassis used by the sibling
+  plugin pages, carrying the tracker's own palette, and centred on an animated
+  replica of the real merge-order view: parallel tracks with branching
+  dependency wires and a scripted Merge Copilot exchange that marks a PR merged
+  and lights up the wave it unlocks.
 
 ## [1.0.0] — 2026-08-03
 

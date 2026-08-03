@@ -4,299 +4,404 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PR Control — the merge order GitHub can't tell you</title>
-<meta name="description" content="One page for every pull request you have in flight, cross-referencing GitHub, your review channel, tickets, and local Claude Code sessions — and computing the order they have to merge in.">
+<meta name="description" content="One page for every pull request you have in flight, cross-referencing GitHub, your review channel, tickets, and local Claude Code sessions — then computing the parallel order they have to merge in. With a Merge Copilot that reads the graph.">
+<meta name="color-scheme" content="light dark">
+<link rel="canonical" href="https://abhay-sastha-s.github.io/pr-control/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%80%3C/text%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PR Control">
+<meta property="og:description" content="Every PR you have in flight on one page — and the parallel order they actually have to merge in. A Claude Code plugin.">
+<meta property="og:url" content="https://abhay-sastha-s.github.io/pr-control/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PR Control">
+<meta name="twitter:description" content="The merge order GitHub can't tell you — as a parallel dependency tree, with a copilot that reads it.">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, p, ul, figure { margin: 0; }
+  ul { padding: 0; }
+  button { font-family: inherit; }
+</style>
+
 <style>
   :root {
-    --paper:#F5F4F1; --surface:#FFFFFF; --sunken:#EBE9E4; --ink:#181713;
-    --muted:#57544C; --faint:#847F74; --line:#DAD7D0; --rule:#C9C5BB;
-    --accent:#1F5E4A;          /* deep pine — the "ready" signal */
-    --gate:#9A5B12;            /* ochre — gated on someone else */
-    --block:#93321F;           /* rust — blocked */
-    --done:#6B7668;            /* moss — merged */
-    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --paper:#EFF1F4; --surface:#FFFFFF; --sunken:#E7EAEE; --ink:#1B242E;
+    --muted:#55606B; --faint:#838D98; --line:#D7DCE3;
+    --accent:#A85E2B; --accent-q:#F3E8DF;         /* terracotta — the tool's own accent */
+    --review:#8F6A12; --appr:#247A4D; --merge:#3061AE; --block:#B23A2D; --draft:#7E8894;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --step: clamp(1rem, 0.6rem + 1.2vw, 1.5rem);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --paper:#14150F; --surface:#1C1D16; --sunken:#101109; --ink:#EDEBE2;
-      --muted:#A8A498; --faint:#7C786C; --line:#2C2E23; --rule:#3A3C2F;
-      --accent:#6FC5A3; --gate:#E0A54E; --block:#F08A6E; --done:#8FA08B;
+      --paper:#0F1319; --surface:#171C23; --sunken:#10141A; --ink:#E7ECF2;
+      --muted:#9AA4B0; --faint:#6E7884; --line:#262D36;
+      --accent:#D08A55; --accent-q:#2A1D12;
+      --review:#D9A13B; --appr:#57B37E; --merge:#6B9BE0; --block:#E06A5B; --draft:#8A94A1;
     }
   }
-  :root[data-theme="dark"]{--paper:#14150F;--surface:#1C1D16;--sunken:#101109;--ink:#EDEBE2;
-    --muted:#A8A498;--faint:#7C786C;--line:#2C2E23;--rule:#3A3C2F;
-    --accent:#6FC5A3;--gate:#E0A54E;--block:#F08A6E;--done:#8FA08B;}
-  :root[data-theme="light"]{--paper:#F5F4F1;--surface:#FFFFFF;--sunken:#EBE9E4;--ink:#181713;
-    --muted:#57544C;--faint:#847F74;--line:#DAD7D0;--rule:#C9C5BB;
-    --accent:#1F5E4A;--gate:#9A5B12;--block:#93321F;--done:#6B7668;}
+  :root[data-theme="dark"] {
+    --paper:#0F1319; --surface:#171C23; --sunken:#10141A; --ink:#E7ECF2;
+    --muted:#9AA4B0; --faint:#6E7884; --line:#262D36; --accent:#D08A55; --accent-q:#2A1D12;
+    --review:#D9A13B; --appr:#57B37E; --merge:#6B9BE0; --block:#E06A5B; --draft:#8A94A1;
+  }
+  :root[data-theme="light"] {
+    --paper:#EFF1F4; --surface:#FFFFFF; --sunken:#E7EAEE; --ink:#1B242E;
+    --muted:#55606B; --faint:#838D98; --line:#D7DCE3; --accent:#A85E2B; --accent-q:#F3E8DF;
+    --review:#8F6A12; --appr:#247A4D; --merge:#3061AE; --block:#B23A2D; --draft:#7E8894;
+  }
 
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
-    font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
-  a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule)}
-  a:hover{border-bottom-color:var(--accent);color:var(--accent)}
-  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-  .wrap{max-width:940px;margin:0 auto;padding:0 clamp(1rem,4vw,2rem) 5rem}
+  body { background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 var(--step) 5rem; }
+  a { color:inherit; }
+  a:focus-visible, button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
 
-  .bar{display:flex;align-items:center;gap:1rem;padding:0.8rem 0;border-bottom:1px solid var(--line);
-    font-family:var(--mono);font-size:0.71rem;letter-spacing:0.11em;text-transform:uppercase;color:var(--faint)}
-  .bar b{color:var(--ink);letter-spacing:0.15em}
-  .bar .push{margin-left:auto;display:flex;gap:1rem;align-items:center}
-  .bar a{border:0}
-  #themeBtn{font:inherit;font-size:0.71rem;letter-spacing:0.11em;text-transform:uppercase;
-    background:none;border:1px solid var(--line);color:var(--muted);padding:0.2rem 0.6rem;cursor:pointer}
-  #themeBtn:hover{color:var(--accent);border-color:var(--accent)}
+  /* ---------- top strip ---------- */
+  .strip { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem 1.25rem; padding:0.85rem 0; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:0.72rem; letter-spacing:0.09em; text-transform:uppercase; color:var(--faint); }
+  .mark { color:var(--ink); letter-spacing:0.14em; font-weight:600; }
+  .strip .sep { color:var(--line); }
+  .strip .push { margin-left:auto; display:flex; gap:0.9rem; align-items:center; }
+  .strip a { text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:1px; }
+  .strip a:hover { color:var(--accent); border-color:var(--accent); }
+  .themebtn { font-family:var(--mono); font-size:0.68rem; letter-spacing:0.09em; text-transform:uppercase; background:none; border:1px solid var(--line); border-radius:2px; color:var(--muted); padding:0.15rem 0.5rem; cursor:pointer; }
+  .themebtn:hover { color:var(--accent); border-color:var(--accent); }
 
-  header.hero{padding:clamp(2.6rem,6vw,4.6rem) 0 clamp(1.8rem,4vw,2.8rem)}
-  .kicker{font-family:var(--mono);font-size:0.71rem;letter-spacing:0.16em;text-transform:uppercase;
-    color:var(--accent);margin-bottom:1.3rem}
-  h1{font-size:clamp(1.9rem,1.2rem+2.4vw,3rem);line-height:1.05;letter-spacing:-0.03em;
-    font-weight:600;margin:0 0 1.1rem;text-wrap:balance;max-width:26ch}
-  h1 i{font-style:italic;font-weight:400;color:var(--accent)}
-  .lede{font-size:1.07rem;color:var(--muted);max-width:58ch;margin:0 0 1.7rem}
-  .cmd{display:inline-flex;align-items:stretch;border:1px solid var(--line);background:var(--surface);max-width:100%}
-  .cmd code{font-family:var(--mono);font-size:0.78rem;padding:0.72rem 0.9rem;white-space:nowrap;
-    overflow-x:auto;color:var(--ink)}
-  .cmd button{font:inherit;font-family:var(--mono);font-size:0.66rem;letter-spacing:0.1em;
-    text-transform:uppercase;border:0;border-left:1px solid var(--line);background:var(--sunken);
-    color:var(--muted);padding:0 0.9rem;cursor:pointer}
-  .cmd button:hover{color:var(--accent)}
+  /* ---------- hero ---------- */
+  .hero { display:grid; grid-template-columns:minmax(0,0.82fr) minmax(0,1.18fr); gap:clamp(2rem,4vw,3.6rem); padding:clamp(3rem,7vw,5rem) 0 clamp(2.5rem,5vw,3.6rem); align-items:start; }
+  @media (max-width:900px) { .hero { grid-template-columns:1fr; } }
+  .eyebrow { font-family:var(--mono); font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--accent); margin-bottom:1.3rem; }
+  h1 { font-family:var(--mono); font-weight:500; font-size:clamp(1.8rem,1.1rem+2.4vw,2.9rem); line-height:1.07; letter-spacing:-0.035em; text-wrap:balance; margin:0 0 1.3rem; }
+  h1 em { font-style:normal; color:var(--accent); }
+  .lede { font-size:1.05rem; color:var(--muted); max-width:38ch; margin:0 0 1.8rem; }
+  .cmd { display:flex; align-items:stretch; border:1px solid var(--line); background:var(--surface); border-radius:3px; overflow:hidden; max-width:34rem; }
+  .cmd code { font-family:var(--mono); font-size:0.78rem; padding:0.8rem 0.9rem; overflow-x:auto; white-space:nowrap; flex:1; color:var(--ink); }
+  .cmd code .dim { color:var(--faint); }
+  .cmd button { font:inherit; font-family:var(--mono); font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; border:0; border-left:1px solid var(--line); background:var(--sunken); color:var(--muted); padding:0 0.95rem; cursor:pointer; }
+  .cmd button:hover { color:var(--accent); }
+  .undercmd { font-family:var(--mono); font-size:0.72rem; color:var(--faint); margin-top:0.8rem; }
+  .undercmd b { color:var(--muted); font-weight:500; }
 
-  /* --- the merge tree: the thing the tool is actually for --- */
-  .tree{border:1px solid var(--line);background:var(--surface);padding:1.3rem 1.2rem;margin:2.2rem 0 0.7rem}
-  .tier{display:flex;gap:0.55rem;flex-wrap:wrap;align-items:stretch;margin-bottom:0.55rem}
-  .tier:last-child{margin-bottom:0}
-  .tier-l{font-family:var(--mono);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
-    color:var(--faint);width:5.2rem;flex:none;padding-top:0.45rem}
-  .node{border:1px solid var(--line);border-left-width:2px;background:var(--paper);
-    padding:0.4rem 0.6rem;font-family:var(--mono);font-size:0.73rem;line-height:1.35}
-  .node b{font-weight:600;display:block}
-  .node span{color:var(--faint);font-size:0.68rem}
-  .node.ready{border-left-color:var(--accent)}
-  .node.gate{border-left-color:var(--gate)}
-  .node.block{border-left-color:var(--block)}
-  .node.done{border-left-color:var(--done);opacity:0.62}
-  .legend{display:flex;flex-wrap:wrap;gap:0.4rem 1.1rem;font-family:var(--mono);font-size:0.66rem;
-    color:var(--faint);margin-bottom:2.6rem}
-  .legend i{display:inline-block;width:0.55rem;height:0.55rem;margin-right:0.35rem;vertical-align:baseline}
-  .cap{font-family:var(--mono);font-size:0.64rem;letter-spacing:0.06em;text-transform:uppercase;
-    color:var(--faint);margin:0.55rem 0 0}
+  /* ---------- the board: a replica of the real tracker ---------- */
+  .board { border:1px solid var(--line); border-radius:5px; background:var(--surface); overflow:hidden; box-shadow:0 1px 2px rgba(20,22,29,0.05), 0 14px 34px -20px rgba(20,22,29,0.28); }
+  .board-bar { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.85rem; border-bottom:1px solid var(--line); background:var(--sunken); font-family:var(--mono); font-size:0.66rem; letter-spacing:0.06em; color:var(--faint); }
+  .board-bar .live { width:7px; height:7px; border-radius:50%; background:var(--appr); flex:none; }
+  .board-bar .title { color:var(--ink); text-transform:uppercase; letter-spacing:0.11em; font-weight:600; }
+  .tabs { margin-left:auto; display:flex; gap:0.15rem; }
+  .tabs span { padding:0.15rem 0.5rem; border-radius:3px; color:var(--faint); }
+  .tabs span.on { background:var(--accent); color:var(--surface); font-weight:600; }
 
-  section{padding:clamp(2.2rem,4.5vw,3.4rem) 0;border-top:1px solid var(--line)}
-  h2{font-size:clamp(1.2rem,0.95rem+0.9vw,1.55rem);letter-spacing:-0.02em;font-weight:600;
-    margin:0 0 1.3rem;text-wrap:balance;max-width:34ch}
-  h3{font-size:0.97rem;font-weight:600;margin:0 0 0.3rem}
-  p{margin:0 0 1rem;color:var(--muted);max-width:70ch}
-  p.plain{color:var(--ink)}
-  p:last-child{margin-bottom:0}
-  strong{color:var(--ink);font-weight:600}
-  em{font-style:italic}
-  code{font-family:var(--mono);font-size:0.85em;background:var(--sunken);padding:0.05em 0.3em;
-    border:1px solid var(--line)}
+  .now { display:flex; flex-wrap:wrap; align-items:center; gap:0.4rem; padding:0.7rem 0.9rem; border-bottom:1px solid var(--line); font-size:0.74rem; color:var(--muted); }
+  .now .lab { font-family:var(--mono); font-size:0.6rem; letter-spacing:0.11em; text-transform:uppercase; color:var(--faint); margin-right:0.2rem; }
+  .now .pnow { border:1px solid var(--appr); color:var(--appr); background:color-mix(in srgb, var(--appr) 12%, transparent); border-radius:99px; padding:1px 8px; font-family:var(--mono); font-size:0.68rem; transition:opacity .3s; }
+  .now .pnow.them { border-color:var(--review); color:var(--review); border-style:dashed; background:color-mix(in srgb, var(--review) 12%, transparent); }
 
-  .qs{display:grid;gap:1.15rem;margin-bottom:1.5rem}
-  .q{border-left:2px solid var(--rule);padding-left:1rem}
-  .q p{margin:0.2rem 0 0}
+  .board-body { display:grid; grid-template-columns:minmax(0,1fr) 15.5rem; }
+  @media (max-width:620px) { .board-body { grid-template-columns:1fr; } }
 
-  .tw{overflow-x:auto;border:1px solid var(--line);background:var(--surface);margin-bottom:1.1rem}
-  table{border-collapse:collapse;width:100%;min-width:32rem;font-size:0.88rem}
-  th,td{text-align:left;padding:0.6rem 0.9rem;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-family:var(--mono);font-size:0.64rem;letter-spacing:0.11em;text-transform:uppercase;
-    color:var(--faint);font-weight:500;background:var(--sunken)}
-  tbody tr:last-child td{border-bottom:0}
-  td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
-  td:not(:first-child){color:var(--muted)}
+  .mtree { position:relative; padding:1rem 0.9rem 1.1rem; overflow:hidden; }
+  svg.wires { position:absolute; inset:0; pointer-events:none; overflow:visible; }
+  .wires path { fill:none; stroke:var(--line); stroke-width:1.6; transition:stroke .5s; }
+  .wires path.done { stroke:var(--merge); }
+  .trk { margin-bottom:0.55rem; }
+  .trk:last-child { margin-bottom:0; }
+  .trk-l { font-family:var(--mono); font-size:0.56rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin:0 0 0.3rem 0.1rem; }
+  .row { display:flex; gap:2.4rem; }
+  .wv { display:flex; flex-direction:column; gap:0.5rem; justify-content:center; }
+  .mnode { position:relative; z-index:1; width:9.2rem; background:var(--paper); border:1px solid var(--line); border-left:2.5px solid var(--draft); border-radius:5px; padding:0.35rem 0.5rem; transition:border-color .35s, box-shadow .35s, opacity .35s; }
+  .mnode b { display:block; font-family:var(--mono); font-size:0.72rem; letter-spacing:-0.01em; }
+  .mnode span { font-size:0.6rem; color:var(--faint); line-height:1.25; display:block; margin-top:1px; }
+  .mnode.st-ready { border-left-color:var(--appr); }
+  .mnode.st-review{ border-left-color:var(--review); }
+  .mnode.st-gate  { border-left-color:var(--review); }
+  .mnode.st-block { border-left-color:var(--block); }
+  .mnode.st-done  { border-left-color:var(--merge); opacity:0.55; }
+  .mnode.pulse { box-shadow:0 0 0 0 var(--accent); animation:pulse 1.2s ease 2; }
+  @keyframes pulse { 0%,100%{ box-shadow:0 0 0 1px var(--accent);} 50%{ box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 28%, transparent);} }
 
-  pre{font-family:var(--mono);font-size:0.78rem;line-height:1.6;background:var(--surface);
-    border:1px solid var(--line);padding:1rem 1.05rem;overflow-x:auto;margin:0 0 1.1rem}
-  pre .c{color:var(--faint)}
-  ul{margin:0 0 1rem;padding-left:1.15rem;color:var(--muted)}
-  li{margin-bottom:0.42rem}
-  li:last-child{margin-bottom:0}
-  .note{border:1px solid var(--line);border-left:2px solid var(--accent);background:var(--surface);
-    padding:1rem 1.15rem;margin-bottom:1.2rem}
-  .note p{margin-bottom:0}
-  footer{border-top:1px solid var(--line);padding-top:1.3rem;margin-top:2rem;
-    font-family:var(--mono);font-size:0.69rem;color:var(--faint);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem}
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  /* the copilot rail */
+  .mcop { border-left:1px solid var(--line); background:var(--sunken); display:flex; flex-direction:column; min-height:15rem; }
+  @media (max-width:620px) { .mcop { border-left:0; border-top:1px solid var(--line); } }
+  .mcop-h { display:flex; align-items:center; gap:0.45rem; padding:0.55rem 0.75rem; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:0.6rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); }
+  .mcop-h .dot { width:7px; height:7px; border-radius:50%; background:var(--appr); }
+  .mcop-log { flex:1; padding:0.7rem 0.7rem 0.4rem; display:flex; flex-direction:column; gap:0.45rem; overflow:hidden; }
+  .cmsg { font-size:0.72rem; line-height:1.45; max-width:92%; padding:0.35rem 0.55rem; border-radius:9px; }
+  .cmsg.u { align-self:flex-end; background:var(--accent); color:var(--surface); border-bottom-right-radius:2px; }
+  .cmsg.b { align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-bottom-left-radius:2px; }
+  .cmsg.b b { font-weight:650; }
+  .cmsg .k { font-family:var(--mono); color:var(--accent); }
+  .mcop-f { padding:0.5rem 0.7rem 0.7rem; }
+  .mcop-f .fake { display:flex; align-items:center; gap:0.4rem; border:1px solid var(--line); border-radius:7px; background:var(--surface); padding:0.35rem 0.55rem; font-size:0.68rem; color:var(--faint); }
+  .mcop-f .fake .send { margin-left:auto; color:var(--accent); font-weight:650; }
+  .caption { font-family:var(--mono); font-size:0.64rem; letter-spacing:0.05em; color:var(--faint); margin-top:0.7rem; text-transform:uppercase; }
+
+  /* ---------- sections ---------- */
+  .sec { padding:clamp(2.4rem,5vw,3.8rem) 0; border-top:1px solid var(--line); }
+  .sec-head { display:grid; grid-template-columns:8.5rem minmax(0,1fr); gap:clamp(1rem,3vw,2.5rem); align-items:baseline; margin-bottom:1.9rem; }
+  @media (max-width:700px) { .sec-head { grid-template-columns:1fr; gap:0.5rem; } }
+  .sec-label { font-family:var(--mono); font-size:0.7rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint); }
+  h2 { font-family:var(--mono); font-weight:500; font-size:clamp(1.2rem,0.95rem+1vw,1.55rem); letter-spacing:-0.025em; line-height:1.2; margin:0; text-wrap:balance; }
+  .sec-body { display:grid; grid-template-columns:8.5rem minmax(0,1fr); gap:clamp(1rem,3vw,2.5rem); }
+  @media (max-width:700px) { .sec-body { grid-template-columns:1fr; } }
+  .sec-body > .col2 { grid-column:2; min-width:0; }
+  @media (max-width:700px) { .sec-body > .col2 { grid-column:1; } }
+  p { margin:0 0 1rem; max-width:68ch; color:var(--muted); }
+  p:last-child { margin-bottom:0; }
+  p.plain { color:var(--ink); }
+  strong { color:var(--ink); font-weight:600; }
+  em { font-style:italic; }
+  code { font-family:var(--mono); font-size:0.85em; background:var(--sunken); padding:0.05em 0.3em; border:1px solid var(--line); border-radius:2px; }
+
+  .probs { display:flex; flex-direction:column; border-top:1px solid var(--line); }
+  .prob { display:grid; grid-template-columns:minmax(0,15rem) minmax(0,1fr); gap:0.4rem clamp(1rem,3vw,2rem); padding:1rem 0; border-bottom:1px solid var(--line); }
+  @media (max-width:620px) { .prob { grid-template-columns:1fr; } }
+  .prob b { font-weight:600; font-size:0.95rem; }
+  .prob span { color:var(--muted); font-size:0.93rem; }
+  .verdict { margin-top:1.7rem; padding-left:1.1rem; border-left:2px solid var(--accent); font-size:1.0rem; }
+
+  .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,15.5rem),1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .panel { background:var(--surface); padding:1.1rem 1.15rem 1.25rem; display:flex; flex-direction:column; gap:0.5rem; }
+  .panel .tag { font-family:var(--mono); font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); }
+  .panel h3 { margin:0; font-size:0.94rem; font-weight:600; }
+  .panel p { font-size:0.89rem; color:var(--muted); margin:0; }
+  .panel.hi { border-left:2px solid var(--accent); }
+
+  .tbl-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; min-width:34rem; font-size:0.9rem; }
+  th, td { text-align:left; padding:0.7rem 0.95rem; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-family:var(--mono); font-size:0.65rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); font-weight:500; background:var(--sunken); }
+  tbody tr:last-child td { border-bottom:0; }
+  td:first-child { font-weight:600; white-space:nowrap; }
+  td:not(:first-child) { color:var(--muted); }
+
+  pre { font-family:var(--mono); font-size:0.78rem; line-height:1.6; background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:1rem 1.05rem; overflow-x:auto; margin:0 0 1rem; }
+  pre .c { color:var(--faint); }
+  pre .a { color:var(--accent); }
+  .stack { display:flex; flex-direction:column; gap:1.1rem; }
+  .step-l { font-family:var(--mono); font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-bottom:0.5rem; }
+  ul.plain { margin:0; padding-left:1.1rem; color:var(--muted); font-size:0.92rem; }
+  ul.plain li { margin-bottom:0.42rem; }
+  ul.plain li:last-child { margin-bottom:0; }
+  ul.plain code { color:var(--ink); }
+  .note { border:1px solid var(--line); border-left:2px solid var(--accent); background:var(--surface); padding:1rem 1.15rem; margin-bottom:1.1rem; }
+  .note h3 { margin:0 0 0.35rem; font-size:0.9rem; font-weight:600; }
+  .note p { font-size:0.9rem; color:var(--muted); margin:0; }
+
+  footer { border-top:1px solid var(--line); padding:1.6rem 0 0; margin-top:0.5rem; font-family:var(--mono); font-size:0.7rem; letter-spacing:0.05em; color:var(--faint); display:flex; flex-wrap:wrap; gap:0.5rem 1.5rem; }
+  footer a { text-decoration:none; border-bottom:1px solid var(--line); }
+  footer a:hover { color:var(--accent); border-color:var(--accent); }
+
+  @media (prefers-reduced-motion:reduce) { * { animation-duration:0.001ms!important; animation-iteration-count:1!important; transition-duration:0.001ms!important; } }
 </style>
 </head>
+
 <body>
 <div class="wrap">
 
-  <div class="bar">
-    <b>PR Control</b><span>v1.1.0</span><span>MIT</span>
+  <div class="strip">
+    <span class="mark">PR Control</span>
+    <span class="sep">/</span><span>v1.1.0</span>
+    <span class="sep">/</span><span>MIT</span>
+    <span class="sep">/</span><span>Claude Code plugin</span>
     <span class="push">
-      <button type="button" id="themeBtn">Theme</button>
       <a href="https://github.com/Abhay-Sastha-S/pr-control">github ↗</a>
+      <button type="button" class="themebtn" id="themeBtn" aria-label="Switch colour theme">Theme</button>
     </span>
   </div>
 
-  <header class="hero">
-    <div class="kicker">Claude Code plugin</div>
-    <h1>"Open" is not a status. <i>Which one do I merge first?</i></h1>
-    <p class="lede">
-      One page for every pull request you have in flight — joining GitHub, the review
-      channel that asked for review, the tickets they close, and the local Claude Code
-      sessions that wrote them. Then it works out the order they actually have to land in.
-    </p>
-    <div class="cmd">
-      <code id="cmdText">/plugin marketplace add Abhay-Sastha-S/pr-control</code>
-      <button type="button" id="copyBtn">Copy</button>
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Claude Code plugin</div>
+      <h1>"Open" is not a status. <em>Which one do I merge first?</em></h1>
+      <p class="lede">One page for every PR you have in flight — joining GitHub, the review channel, the tickets they close, and the local Claude Code sessions that wrote them. Then it works out the <em>parallel</em> order they have to land in.</p>
+      <div class="cmd">
+        <code id="cmdText"><span class="dim">/</span>plugin marketplace add Abhay-Sastha-S/pr-control</code>
+        <button type="button" id="copyBtn">Copy</button>
+      </div>
+      <div class="undercmd">then <b>/plugin install pr-control</b> → <b>/pr-control</b></div>
     </div>
 
-    <div class="tree" aria-label="Example merge-order tree">
-      <div class="tier">
-        <div class="tier-l">merge now</div>
-        <div class="node ready"><b>shared-lib#412</b><span>approved · nothing ahead of it</span></div>
-        <div class="node ready"><b>backend#209</b><span>approved · waiting on a human</span></div>
+    <div>
+      <div class="board" aria-label="Replica of the PR Control tracker — merge-order view">
+        <div class="board-bar">
+          <span class="live"></span><span class="title">PR Control</span>
+          <span>your PRs</span>
+          <span class="tabs"><span>Pipeline</span><span>Timeline</span><span class="on">Merge order</span></span>
+        </div>
+        <div class="now">
+          <span class="lab">Mergeable in parallel now</span>
+          <span id="nowStrip"></span>
+        </div>
+        <div class="board-body">
+          <div class="mtree" id="mtree"><svg class="wires" id="wires"></svg></div>
+          <div class="mcop">
+            <div class="mcop-h"><span class="dot"></span>Merge Copilot</div>
+            <div class="mcop-log" id="copLog"></div>
+            <div class="mcop-f"><div class="fake"><span>Ask about your merge order…</span><span class="send">Ask</span></div></div>
+          </div>
+        </div>
       </div>
-      <div class="tier">
-        <div class="tier-l">then</div>
-        <div class="node gate"><b>web-app#99</b><span>🚀 needs backend#209 deployed</span></div>
-        <div class="node block"><b>backend#217</b><span>⛔ behind a colleague's #214</span></div>
-      </div>
-      <div class="tier">
-        <div class="tier-l">landed</div>
-        <div class="node done"><b>backend#212</b><span>✓ merged — on dev</span></div>
-      </div>
+      <div class="caption">Illustration of the interface — your real tree is built from your own PRs</div>
     </div>
-    <div class="legend">
-      <span><i style="background:var(--accent)"></i>ready</span>
-      <span><i style="background:var(--gate)"></i>gated on a deploy</span>
-      <span><i style="background:var(--block)"></i>blocked behind someone else</span>
-      <span><i style="background:var(--done)"></i>merged</span>
-    </div>
-    <p class="cap">Illustrative — the real tree is built from your own PRs, with independent chains in parallel tracks</p>
-  </header>
-
-  <section>
-    <h2>Why it exists</h2>
-    <div class="qs">
-      <div class="q">
-        <h3>"Open" collapses four different situations into one word.</h3>
-        <p>Waiting for a first review, waiting on requested changes, approved and waiting for
-           a human to press merge, and blocked behind someone else's deploy are completely
-           different problems — and only one of them is your move. GitHub shows all four as
-           a green "Open".</p>
-      </div>
-      <div class="q">
-        <h3>The merge order lives where no API can see it.</h3>
-        <p>A sentence in a Slack thread — <em>"merge the backend one first or the page 404s"</em> —
-           two PRs closing the same ticket, a pair of stacked branches. Get the order wrong and
-           you spend the afternoon rebasing.</p>
-      </div>
-      <div class="q">
-        <h3>A PR nobody was told about isn't in review.</h3>
-        <p>It's just open. That gap is invisible on GitHub, where the PR looks perfectly healthy.</p>
-      </div>
-      <div class="q">
-        <h3>The reasoning is in a session you can't name.</h3>
-        <p>Why you made a call four days ago is in a Claude Code transcript identified by a UUID.
-           Each PR here links to the sessions that touched it, with a ready-to-paste
-           <code>claude --resume</code>.</p>
-      </div>
-    </div>
-    <p class="plain">Every one of those answers already exists. They're just in four tools that
-       don't join to each other. This does the join.</p>
   </section>
 
-  <section>
-    <h2>What it computes that nothing else does</h2>
-    <p>The heart of it is the edge set — <em>a must merge before b</em> — derived in precedence order:</p>
-    <div class="tw"><table>
-      <thead><tr><th>Source</th><th>Meaning</th></tr></thead>
-      <tbody>
-        <tr><td>Channel-stated chains</td><td>Someone said so in the review channel. Highest authority, and hand-maintained in config because no API exposes it.</td></tr>
-        <tr><td>Branch stacks</td><td><code>b</code>'s base branch is <code>a</code>'s head. Structural, so it's inferred.</td></tr>
-        <tr><td>Shared open tickets</td><td>Two open PRs closing the same ticket ship together.</td></tr>
-        <tr><td>Same-repo ordering</td><td>Older open PRs in a repo where you have one merge first, or you rebase.</td></tr>
-      </tbody>
-    </table></div>
-    <p>Ties break on a configurable service rank — shared libraries before services, services
-       before user-facing apps. Other people's PRs are pulled in <strong>only</strong> when they
-       share an edge with one of yours, so the page stays about your work while still showing
-       who you're waiting on.</p>
-  </section>
-
-  <section>
-    <h2>What the page gives you</h2>
-    <p>One self-contained HTML file, three ways to look at the same set of PRs:</p>
-    <div class="tw"><table>
-      <thead><tr><th>View</th><th>Answers</th></tr></thead>
-      <tbody>
-        <tr><td>Pipeline</td><td>Every PR in a column for its <em>real</em> state — first review, changes requested, approved-and-waiting-on-a-human, merged to dev — instead of GitHub's single green "Open".</td></tr>
-        <tr><td>Timeline replay</td><td>Scrub the last weeks and watch each PR open, collect its review ask, and land — so you can see where the time actually went.</td></tr>
-        <tr><td>Merge order</td><td>The dependency tree. Independent chains sit in separate <em>tracks</em> that run in parallel; within a track, PRs in the same <em>wave</em> can merge at once. Tick one merged and the wave it unlocks lights up.</td></tr>
-      </tbody>
-    </table></div>
-    <h3 style="margin-top:1.5rem">Merge Copilot</h3>
-    <p>A panel on the merge-order view that reads the whole graph — every dependency, who authored
-       what, what's blocked on whom. Ask it in plain words: <em>what can I merge now</em>,
-       <em>what's the critical path</em>, <em>who's waiting on me</em>,
-       <em>what's blocking web-app#99</em>. It answers from your own data rather than guessing,
-       jumps the tree to the PR it names, marks things merged as you go, and composes a review
-       ping for the channel. In keeping with the rule below, it <strong>drafts and deep-links —
-       it never sends Slack or merges anything.</strong> Those stay your call.</p>
-  </section>
-
-  <section>
-    <h2>Nothing about your organisation is in the repo</h2>
-    <div class="note">
-      <p>Every organisation-specific value — your org, your GitHub login, your Slack workspace
-         and channel, your teammates, your Linear workspace, your dependency chains — lives in
-         one config file that is <strong>never committed</strong>. The release check fails the
-         build if a config file, a Slack export, or a built page is ever staged, so the repo
-         can't start leaking by accident.</p>
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">Why it exists</div>
+      <h2>"Open" collapses four different situations into one word.</h2>
     </div>
+    <div class="sec-body">
+      <div class="col2">
+        <div class="probs">
+          <div class="prob"><b>State is invisible</b><span>Waiting for a first review, waiting on requested changes, approved and waiting for a human to press merge, and blocked behind someone else's deploy are different problems — and only one is your move. GitHub shows all four as a green "Open".</span></div>
+          <div class="prob"><b>The merge order lives where no API can see it</b><span>A sentence in a Slack thread — <em>"merge the backend one first or the page 404s"</em> — two PRs closing one ticket, a pair of stacked branches. Get the order wrong and you lose the afternoon to rebasing.</span></div>
+          <div class="prob"><b>A PR nobody was told about isn't in review</b><span>It's just open. That gap is invisible on GitHub, where the PR looks perfectly healthy.</span></div>
+          <div class="prob"><b>The reasoning is in a session you can't name</b><span>Why you made a call four days ago is in a Claude Code transcript identified by a UUID. Each PR links the sessions that touched it, with a ready-to-paste <code>claude --resume</code>.</span></div>
+        </div>
+        <p class="verdict">Every one of those answers already exists — just in four tools that don't join to each other. <strong>This does the join, and draws the order out of it.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">What you get</div>
+      <h2>One self-contained page, three ways to look at the same PRs.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2">
+        <div class="panels">
+          <div class="panel"><div class="tag">View 01</div><h3>Pipeline</h3><p>Every PR in a column for its <em>real</em> state — first review, changes requested, approved-and-waiting-on-a-human, merged to dev — instead of one green "Open".</p></div>
+          <div class="panel"><div class="tag">View 02</div><h3>Timeline replay</h3><p>Scrub the last weeks and watch each PR open, collect its review ask, and land — so you can see where the time actually went.</p></div>
+          <div class="panel"><div class="tag">View 03</div><h3>Merge order</h3><p>The dependency tree. Independent chains sit in separate <em>tracks</em> that run in parallel; within a track, PRs in the same <em>wave</em> merge at once. Tick one and the wave it unlocks lights up.</p></div>
+          <div class="panel hi"><div class="tag">Copilot</div><h3>Merge Copilot</h3><p>Reads the whole graph and answers in plain words — <em>what can I merge now</em>, <em>the critical path</em>, <em>who's waiting on me</em>. It jumps the tree to a named PR and drafts a review ping. It never sends Slack or merges — that stays your call.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">What it computes</div>
+      <h2>The edge set — <em>a must merge before b</em> — in precedence order.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2">
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Source</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Channel-stated chains</td><td>Someone said so in the review channel. Highest authority, hand-maintained in config because no API exposes it.</td></tr>
+            <tr><td>Branch stacks</td><td><code>b</code>'s base branch is <code>a</code>'s head. Structural, so it's inferred.</td></tr>
+            <tr><td>Shared open tickets</td><td>Two open PRs closing the same ticket ship together.</td></tr>
+            <tr><td>Same-repo ordering</td><td>Older open PRs in a repo where you have one merge first, or you rebase.</td></tr>
+          </tbody>
+        </table></div>
+        <p style="margin-top:1.1rem">Ties break on a configurable service rank — shared libraries before services, services before user-facing apps — and the result is laid out as parallel tracks with the fan-out drawn as branching wires. Other people's PRs are pulled in <strong>only</strong> when they share an edge with one of yours, so the page stays about your work while still showing who you're waiting on.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">The copilot</div>
+      <h2>A grounded assistant that reads the tree — it doesn't guess, and it doesn't act for you.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2">
+        <p>The panel on the merge-order view reads the built graph — every dependency, who authored what, what's blocked on whom — and answers from your own data. Ask it <em>what can I merge now</em> and it names the set that's unblocked and can go in parallel; ask <em>what's blocking web#99</em> and it walks the edges. Naming a PR jumps the tree to it and pulses it; <em>mark it merged</em> re-flows the graph so the wave it unlocks lights up.</p>
+        <p class="plain">It runs entirely client-side over the data already in the page, so there's no backend and no key to leak. And in keeping with the rule below, it <strong>drafts and deep-links — it never sends Slack or merges anything.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">Privacy</div>
+      <h2>Nothing about your organisation is in the repo.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2 stack">
+        <div class="note">
+          <h3>One config file, never committed</h3>
+          <p>Your org, GitHub login, Slack workspace and channel, teammates, Linear workspace, and dependency chains all live in one config file. The release check fails the build if a config file, a Slack export, or a built page is ever staged — so the repo can't start leaking by accident.</p>
+        </div>
 <pre>cp config.example.json ~/.claude/pr-control/config.json
 $EDITOR ~/.claude/pr-control/config.json</pre>
-    <p>The page template holds no organisation strings either — it labels itself at runtime from
-       a <code>meta</code> block the build injects.</p>
+        <p>The page template holds no organisation strings either — it labels itself at runtime from a <code>meta</code> block the build injects.</p>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>What it reads</h2>
-    <p>Worth knowing before you run it, because the answer is "quite a lot":</p>
-    <ul>
-      <li><strong>GitHub</strong>, through the <code>gh</code> CLI you're already signed in to — PR metadata only, for the repos you list.</li>
-      <li><strong>Slack</strong>, read-only, through an MCP server — one channel, searched for review requests. The page never gets Slack <em>write</em> tools; replying — including the copilot's drafted review pings — is copy-to-clipboard plus a deep link into the thread. Nothing is ever sent for you.</li>
-      <li><strong>Linear</strong>, read-only — issue titles and statuses.</li>
-      <li><strong><code>~/.claude/projects</code></strong>, read-only — your local Claude Code transcripts, scanned for PR URLs. Transcript content never leaves your machine; only the session id, project directory, and existing summary line are used.</li>
-    </ul>
-    <p>Everything runs locally. The only thing that goes anywhere is the finished page, and only when you publish it.</p>
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">What it reads</div>
+      <h2>Quite a lot — but all of it locally, and only for the repos you list.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2">
+        <ul class="plain">
+          <li><strong>GitHub</strong>, through the <code>gh</code> CLI you're already signed in to — PR metadata only.</li>
+          <li><strong>Slack</strong>, read-only, through an MCP server — one channel, searched for review requests. The page never gets Slack <em>write</em> tools; replying — including the copilot's drafts — is copy-to-clipboard plus a deep link into the thread. Nothing is ever sent for you.</li>
+          <li><strong>Linear</strong>, read-only — issue titles and statuses.</li>
+          <li><strong><code>~/.claude/projects</code></strong>, read-only — your local Claude Code transcripts, scanned for PR URLs. Content never leaves your machine; only the session id, directory, and existing summary line are used.</li>
+        </ul>
+        <p style="margin-top:1.1rem">Everything runs locally. The only thing that goes anywhere is the finished page, and only when you publish it.</p>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>The pipeline</h2>
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">The pipeline</div>
+      <h2>Five local reads, one join, one page — with a smoke test that runs it.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2 stack">
 <pre>gh pr list ─────────────► prs.jsonl ──┐
 slack search ──► slack_mentions.json ─┤
-linear issues ─► linear_issues.json ──┼──► merge.py ──► prdata.json
+linear issues ─► linear_issues.json ──┼──► <span class="a">merge.py</span> ──► prdata.json
 extract_sessions.py ──► sessions.json ┤                      │
 gh pr list (bodies) ──► tickets.jsonl ┘                      ▼
-                                              build_page.py ──► pr-control.html
+                                              <span class="a">build_page.py</span> ──► pr-control.html
                                                                      │
                                             scripts/smoke-page.mjs ──┴──► publish</pre>
-    <p><strong>That last step earns its place.</strong> The page is one large inline script, and a
-       syntax check only proves it parses — a <code>const</code> used before its declaration parses
-       perfectly and then renders a blank page. The smoke test executes the built page against a
-       DOM shim and fails on load-time errors. It caught exactly that bug while this was being
-       packaged.</p>
+        <p><strong>That last step earns its place.</strong> The page is one large inline script, and a syntax check only proves it parses — a <code>const</code> used before its declaration parses perfectly and then renders a blank page. The smoke test executes the built page against a DOM shim and fails on load-time errors. It caught exactly that bug while this was being packaged.</p>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>Credits</h2>
-    <ul>
-      <li><strong><a href="https://claude.com/claude-code">Claude Code</a></strong>, by <a href="https://www.anthropic.com/">Anthropic</a> — the sessions column reads its local transcript format, and the skill drives the refresh.</li>
-      <li><strong><a href="https://cli.github.com/">GitHub CLI</a></strong> — every PR fact comes from it.</li>
-      <li><strong><a href="https://slack.com/">Slack</a></strong> and <strong><a href="https://linear.app/">Linear</a></strong> — read through their MCP servers; both are their companies' products and this only reads from them.</li>
-      <li><strong><a href="https://jqlang.github.io/jq/">jq</a></strong> — shapes the <code>gh</code> output.</li>
-      <li><strong>No runtime dependencies</strong> — Python standard library and one inline HTML page. Nothing bundled or vendored.</li>
-      <li><strong>Written with</strong> <a href="https://claude.com/claude-code">Claude Code</a>, co-author on the commits that built this.</li>
-    </ul>
-    <p>Claude, Claude Code, and Anthropic are trademarks of Anthropic; GitHub, Slack, and Linear
-       are trademarks of their respective owners. This project is <strong>unofficial</strong> and
-       is not affiliated with, endorsed by, or supported by any of them.</p>
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">Install</div>
+      <h2>Add the marketplace, install, and run the skill.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2 stack">
+<pre>/plugin marketplace add Abhay-Sastha-S/pr-control
+/plugin install pr-control
+/pr-control              <span class="c"># rebuild the tracker from live data and republish</span></pre>
+        <p style="color:var(--muted);font-size:0.92rem">Requires the <code>gh</code> CLI signed in, and — for the Slack and Linear columns — those MCP servers connected in Claude. GitHub and local-session data refresh even without them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-label">Credits</div>
+      <h2>What it's built on.</h2>
+    </div>
+    <div class="sec-body">
+      <div class="col2">
+        <ul class="plain">
+          <li><strong><a href="https://claude.com/claude-code">Claude Code</a></strong>, by <a href="https://www.anthropic.com/">Anthropic</a> — the sessions column reads its local transcript format, and the skill drives the refresh.</li>
+          <li><strong><a href="https://cli.github.com/">GitHub CLI</a></strong> — every PR fact comes from it.</li>
+          <li><strong><a href="https://slack.com/">Slack</a></strong> and <strong><a href="https://linear.app/">Linear</a></strong> — read through their MCP servers; this only reads from them.</li>
+          <li><strong>No runtime dependencies</strong> — Python standard library and one inline HTML page. Nothing bundled or vendored.</li>
+          <li><strong>Written with</strong> <a href="https://claude.com/claude-code">Claude Code</a>, co-author on the commits that built this.</li>
+        </ul>
+        <p style="margin-top:1rem">Claude, Claude Code, and Anthropic are trademarks of Anthropic; GitHub, Slack, and Linear are trademarks of their respective owners. This project is <strong>unofficial</strong> and not affiliated with, endorsed by, or supported by any of them.</p>
+      </div>
+    </div>
   </section>
 
   <footer>
@@ -308,28 +413,146 @@ gh pr list (bodies) ──► tickets.jsonl ┘                      ▼
 
 <script>
 (function () {
-  var root = document.documentElement, btn = document.getElementById('themeBtn');
-  var saved = null;
-  try { saved = localStorage.getItem('prc-theme'); } catch (e) {}
-  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
-  btn.addEventListener('click', function () {
+  // Theme: follow the OS unless the visitor overrides it here.
+  var root = document.documentElement, stored = null;
+  try { stored = localStorage.getItem('prc-theme'); } catch (e) {}
+  if (stored === 'dark' || stored === 'light') root.setAttribute('data-theme', stored);
+  document.getElementById('themeBtn').addEventListener('click', function () {
     var dark = root.getAttribute('data-theme') === 'dark' ||
       (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     var next = dark ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('prc-theme', next); } catch (e) {}
+    drawWires();
   });
 
   var copy = document.getElementById('copyBtn');
   copy.addEventListener('click', function () {
     navigator.clipboard.writeText(document.getElementById('cmdText').textContent).then(function () {
-      copy.textContent = 'Copied';
-      setTimeout(function () { copy.textContent = 'Copy'; }, 1600);
+      copy.textContent = 'Copied'; setTimeout(function(){ copy.textContent = 'Copy'; }, 1600);
     }).catch(function () {
-      copy.textContent = 'Press ⌘C';
-      setTimeout(function () { copy.textContent = 'Copy'; }, 1600);
+      copy.textContent = 'Press ⌘C'; setTimeout(function(){ copy.textContent = 'Copy'; }, 1600);
     });
   });
+
+  /* ---------- the tracker replica ---------- */
+  // Synthetic, org-neutral PRs — an illustration, not real data.
+  var NODES = [
+    { id:'api209', label:'api#209',  sub:'approved',          st:'ready', trk:0, wv:0 },
+    { id:'web99',  label:'web#99',   sub:'🚀 needs api#209',  st:'gate',  trk:0, wv:1 },
+    { id:'lib412', label:'lib#412',  sub:'library · approved',st:'ready', trk:1, wv:0 },
+    { id:'svc88',  label:'svc#88',   sub:'after lib#412',     st:'block', trk:1, wv:1 },
+    { id:'svc91',  label:'svc#91',   sub:'after lib#412',     st:'block', trk:1, wv:1 },
+    { id:'app12',  label:'app#12',   sub:'stacked base',      st:'ready', trk:2, wv:0 },
+    { id:'app13',  label:'app#13',   sub:'on app#12',         st:'block', trk:2, wv:1 },
+    { id:'docs5',  label:'docs#5',   sub:'no dependencies',   st:'ready', trk:3, wv:0 }
+  ];
+  var EDGES = [['api209','web99'],['lib412','svc88'],['lib412','svc91'],['app12','app13']];
+  var TRK_LABELS = ['backend → web', 'library fan-out', 'stacked branches', 'free lane'];
+  var byId = {}; NODES.forEach(function (n) { byId[n.id] = n; });
+
+  var tree = document.getElementById('mtree'), svg = document.getElementById('wires');
+  var elById = {};
+  (function buildTree() {
+    var trks = {};
+    NODES.forEach(function (n) { (trks[n.trk] = trks[n.trk] || []).push(n); });
+    Object.keys(trks).forEach(function (t) {
+      var wrap = document.createElement('div'); wrap.className = 'trk';
+      var lab = document.createElement('div'); lab.className = 'trk-l'; lab.textContent = TRK_LABELS[t] || ('track ' + t);
+      wrap.appendChild(lab);
+      var row = document.createElement('div'); row.className = 'row';
+      var waves = {};
+      trks[t].forEach(function (n) { (waves[n.wv] = waves[n.wv] || []).push(n); });
+      Object.keys(waves).forEach(function (w) {
+        var col = document.createElement('div'); col.className = 'wv';
+        waves[w].forEach(function (n) {
+          var node = document.createElement('div');
+          node.className = 'mnode st-' + n.st; node.setAttribute('data-node', n.id);
+          node.innerHTML = '<b>' + n.label + '</b><span>' + n.sub + '</span>';
+          col.appendChild(node); elById[n.id] = node;
+        });
+        row.appendChild(col);
+      });
+      wrap.appendChild(row); tree.appendChild(wrap);
+    });
+  })();
+
+  var paths = {};
+  function drawWires() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    paths = {};
+    var base = tree.getBoundingClientRect();
+    svg.setAttribute('width', base.width); svg.setAttribute('height', base.height);
+    EDGES.forEach(function (e) {
+      var a = elById[e[0]], b = elById[e[1]]; if (!a || !b) return;
+      var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      var x1 = ra.right - base.left, y1 = ra.top - base.top + ra.height / 2;
+      var x2 = rb.left - base.left, y2 = rb.top - base.top + rb.height / 2;
+      var mx = (x1 + x2) / 2;
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' + mx + ' ' + y2 + ', ' + x2 + ' ' + y2);
+      if (byId[e[0]].st === 'done') p.setAttribute('class', 'done');
+      svg.appendChild(p); paths[e[0] + '>' + e[1]] = p;
+    });
+  }
+
+  function setState(id, st) {
+    var n = byId[id]; if (!n) return;
+    n.st = st;
+    var el = elById[id];
+    el.className = 'mnode st-' + st;
+    EDGES.forEach(function (e) { if (e[0] === id && paths[e[0] + '>' + e[1]]) paths[e[0] + '>' + e[1]].setAttribute('class', st === 'done' ? 'done' : ''); });
+  }
+  function pulse(id) { var el = elById[id]; if (!el) return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+
+  var nowStrip = document.getElementById('nowStrip');
+  function renderNow() {
+    var ready = NODES.filter(function (n) { return n.st === 'ready'; });
+    nowStrip.innerHTML = ready.map(function (n) { return '<span class="pnow">▶ ' + n.label + '</span>'; }).join('');
+  }
+  renderNow();
+
+  var log = document.getElementById('copLog');
+  function msg(cls, html) {
+    var m = document.createElement('div'); m.className = 'cmsg ' + cls; m.innerHTML = html;
+    log.appendChild(m); while (log.children.length > 5) log.removeChild(log.firstChild);
+    return m;
+  }
+
+  drawWires();
+  var ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(drawWires) : null;
+  if (ro) ro.observe(tree);
+  window.addEventListener('resize', drawWires);
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Scripted copilot exchange that drives the tree — the loop that shows what using it feels like.
+  var SCRIPT = [
+    { d: 300,  fn: function () { msg('b', '<b>6 open PRs</b> · <b>4 can merge in parallel</b> right now.'); } },
+    { d: 1500, fn: function () { msg('u', 'what can I merge now'); } },
+    { d: 900,  fn: function () { msg('b', 'Nothing ahead of these — different tracks, so all at once:'); ['api209','lib412','app12','docs5'].forEach(pulse); } },
+    { d: 2100, fn: function () { msg('u', 'mark api#209 merged'); } },
+    { d: 900,  fn: function () { setState('api209','done'); setState('web99','ready'); pulse('web99'); renderNow(); msg('b', 'Done — that unlocks <span class="k">web#99</span>.'); } },
+    { d: 2300, fn: function () { msg('u', "what's the critical path"); } },
+    { d: 900,  fn: function () { pulse('lib412'); msg('b', '<span class="k">lib#412 → svc#88 / svc#91</span> — the branch gating the most. Start there.'); } },
+    { d: 3200, fn: function () { reset(); } }
+  ];
+  function reset() {
+    setState('api209','ready'); setState('web99','gate');
+    log.innerHTML = ''; renderNow(); drawWires();
+    if (!reduced) run(0);
+  }
+  function run(i) {
+    if (i >= SCRIPT.length) return;
+    setTimeout(function () { SCRIPT[i].fn(); run(i + 1); }, SCRIPT[i].d);
+  }
+
+  if (reduced) {
+    // Static but representative: show the exchange's end state.
+    msg('b', '<b>6 open</b> · 4 mergeable in parallel. Ask me <span class="k">what can I merge now</span> or <span class="k">the critical path</span>.');
+  } else {
+    run(0);
+  }
 })();
 </script>
 </body>
