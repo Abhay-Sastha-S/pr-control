@@ -1,7 +1,7 @@
 {
   "name": "pr-control",
   "displayName": "PR Control",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "One page for every PR you have in flight — cross-referencing GitHub, the review channel that asked for review, the tickets they close, and the local Claude Code sessions that wrote them, then computing the order they actually have to merge in. Adds a /pr-control skill that rebuilds and republishes it.",
   "author": {
     "name": "Abhay Sastha S",

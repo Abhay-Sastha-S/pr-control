@@ -9,6 +9,31 @@ versioning is [semantic](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-08-04
+
+### Added
+
+- **Refresh helper** — a `⟳ Refresh` control that explains the page is a
+  GitHub snapshot (a shared page can't read GitHub live), shows the "as of"
+  time, and one-click-copies the `/pr-control` rebuild command. Points at
+  scheduling the skill for hands-off refresh.
+- **Conversational Merge Copilot** — the assistant now holds context: name a
+  PR once and refer to it as "it", answer a "which PR?" prompt on the next
+  line, confirm a suggested action with "yes". Understands greetings, thanks,
+  synonyms, and free-form phrasing, and falls back with suggestions instead of
+  a dead end. Still grounded in the graph — it is not a language model and says
+  so if asked.
+
+### Fixed
+
+- **Slack actions in the published page** — clipboard and `window.open` are
+  frequently blocked in the artifact's sandboxed iframe, so "continue chat"
+  silently did nothing. Copy now falls back to a select-and-`execCommand` path
+  (and tells you to press ⌘/Ctrl+C if even that is blocked), and every
+  open-in-Slack affordance is a real anchor the browser can follow. The reply
+  box is pre-filled with a review ping. The same robust copy is used for
+  resume-command and copilot buttons.
+
 ## [1.1.0] — 2026-08-03
 
 ### Added
