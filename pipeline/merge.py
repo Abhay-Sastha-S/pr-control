@@ -100,16 +100,6 @@ for key, p in prs.items():
     recent = (p.get("updatedAt") or "") >= CUTOFF
     if not (mentioned or local or p["state"] == "OPEN" or recent):
         continue
-    status = None
-    if p["state"] == "MERGED":
-        status = "merged"
-    elif p["state"] == "CLOSED":
-        status = "closed"
-    elif p.get("isDraft"):
-        status = "draft"
-    else:
-        rd = p.get("reviewDecision") or ""
-        status = {"APPROVED": "approved", "CHANGES_REQUESTED": "changes"}.get(rd, "review")
     sess = []
     for s in sess_map.get(key, [])[:3]:
         path = resolve_project(s["project"])
@@ -128,6 +118,33 @@ for key, p in prs.items():
             "statusType": (li or {}).get("statusType", ""),
             "ticketTitle": (li or {}).get("title", ""),
         })
+    # Deploy stage inferred from Linear (see memory: myfi-pr-deploy-lifecycle):
+    #   In Review = on dev (1) · Ready For Prod = ready for prod (2) · Done = on prod (3)
+    def _lin_stage(t):
+        s = (t.get("status") or "").strip().lower()
+        if t.get("statusType") == "completed" or s == "done":
+            return 3
+        if "ready" in s and "prod" in s:
+            return 2
+        if s == "in review":
+            return 1
+        return 0
+    lin = max([_lin_stage(t) for t in tix], default=0)
+    # Combine GitHub state + Linear deploy stage into one lifecycle status.
+    if p["state"] == "CLOSED":
+        status = "closed"
+    elif lin >= 3:
+        status = "prod"                       # merged + deployed to prod (Linear Done)
+    elif p["state"] == "MERGED" or lin >= 2:
+        status = "readyprod"                  # merged to main, not yet on prod
+    elif lin >= 1:
+        status = "dev"                        # deployed on dev (Linear In Review), still open
+    elif p.get("isDraft"):
+        status = "draft"
+    else:
+        rd = p.get("reviewDecision") or ""
+        status = "changes" if rd == "CHANGES_REQUESTED" else "in1000x"
+    deployStage = ["none", "dev", "readyprod", "prod"][lin]
     out.append({
         "id": key,
         "repo": p["repo"],
@@ -148,6 +165,7 @@ for key, p in prs.items():
         "slack": sorted(slack_map.get(key, []), key=lambda m: str(m["when"])),
         "sessions": sess,
         "tickets": tix,
+        "deployStage": deployStage,
     })
 
 # Slack-mentioned PRs we couldn't fetch from GitHub (private/not in list window)
@@ -184,15 +202,23 @@ for d in DEPS:
 # compute what each PR is waiting on
 for p in out:
     wait = ""
-    if p["state"] == "OPEN":
+    st = p["status"]
+    if st == "prod":
+        wait = "Done — merged and deployed to prod"
+    elif st == "readyprod":
+        wait = "Ready for prod — merged to main, awaiting the prod build (manual)"
+    elif st == "dev":
+        wait = "On dev — deployed to dev; merge to main when it's proven out"
+    elif p["state"] == "OPEN":
         if p["draft"]:
             wait = "Author — still a draft"
-        elif p["status"] == "changes":
+        elif st == "changes":
             wait = "Author — changes requested"
-        elif p["status"] == "approved":
+        elif p.get("reviewDecision") == "APPROVED":
             wait = f"Human merge — {REVIEWER} approved, merging stays with a human"
         else:
-            wait = f"{REVIEWER} review" if p["slack"] else f"Review — not yet posted to #{CHANNEL}"
+            wait = f"In {REVIEWER} — review requested" if p["slack"] else f"Not yet posted to #{CHANNEL} for review"
+    if p["state"] != "CLOSED":
         for d in p["deps"]:
             if d["kind"] == "order":
                 unmerged = [b for b in d.get("before", []) if by_id.get(b, {}).get("state") not in ("MERGED", None) and b in by_id]

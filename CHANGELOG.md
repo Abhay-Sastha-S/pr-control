@@ -9,7 +9,19 @@ versioning is [semantic](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.2.0] — 2026-08-04
+## [1.3.0] — 2026-08-04
+
+### Changed
+
+- **Status is now the deploy lifecycle, not raw GitHub review state.** Each PR
+  is placed as **In review → On dev → Ready for prod → On prod** (plus Draft /
+  Changes / Closed), with the deploy stage read from Linear: status *In Review*
+  = deployed on **dev**; **merged to main** (or Linear *Ready for Prod*) = **ready
+  for prod**; Linear *Done* = **on prod**. Pipeline columns, KPI tiles, card and
+  pill colours, the timeline replay, the merge-order queue, and the copilot all
+  speak this vocabulary. A new `deployStage` field rides on each PR.
+- `waitingOn` reflects the stage: "On dev — merge to main when proven out",
+  "Ready for prod — awaiting the manual prod build", "Done — deployed to prod".
 
 ### Added
 

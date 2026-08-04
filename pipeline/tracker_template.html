@@ -5,6 +5,7 @@
   --acc:#A85E2B; --acc-ink:#FFFFFF;
   --draft:#7E8894; --review:#8F6A12; --review-bg:#F5E9CD; --changes:#B23A2D; --changes-bg:#F6DDD9;
   --appr:#247A4D; --appr-bg:#D9EEE2; --merge:#3061AE; --merge-bg:#DCE7F7; --closed:#6B7480; --closed-bg:#E6E9EC;
+  --ready:#7A4DB8; --ready-bg:#EAE2F6;
   --blocked:#C13A2C; --shadow:0 10px 30px rgba(23,32,44,.14);
 }
 @media (prefers-color-scheme: dark){:root{
@@ -12,6 +13,7 @@
   --acc:#D08A55; --acc-ink:#14181D;
   --draft:#8A94A1; --review:#D9A13B; --review-bg:#33290F; --changes:#E06A5B; --changes-bg:#3A1B16;
   --appr:#57B37E; --appr-bg:#12301F; --merge:#6B9BE0; --merge-bg:#16263D; --closed:#77808C; --closed-bg:#232931;
+  --ready:#B79BEA; --ready-bg:#241A3A;
   --blocked:#E06A5B; --shadow:0 12px 34px rgba(0,0,0,.5);
 }}
 :root[data-theme="dark"]{
@@ -19,6 +21,7 @@
   --acc:#D08A55; --acc-ink:#14181D;
   --draft:#8A94A1; --review:#D9A13B; --review-bg:#33290F; --changes:#E06A5B; --changes-bg:#3A1B16;
   --appr:#57B37E; --appr-bg:#12301F; --merge:#6B9BE0; --merge-bg:#16263D; --closed:#77808C; --closed-bg:#232931;
+  --ready:#B79BEA; --ready-bg:#241A3A;
   --blocked:#E06A5B; --shadow:0 12px 34px rgba(0,0,0,.5);
 }
 :root[data-theme="light"]{
@@ -26,6 +29,7 @@
   --acc:#A85E2B; --acc-ink:#FFFFFF;
   --draft:#7E8894; --review:#8F6A12; --review-bg:#F5E9CD; --changes:#B23A2D; --changes-bg:#F6DDD9;
   --appr:#247A4D; --appr-bg:#D9EEE2; --merge:#3061AE; --merge-bg:#DCE7F7; --closed:#6B7480; --closed-bg:#E6E9EC;
+  --ready:#7A4DB8; --ready-bg:#EAE2F6;
   --blocked:#C13A2C; --shadow:0 10px 30px rgba(23,32,44,.14);
 }
 *{box-sizing:border-box}
@@ -55,8 +59,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .kpi .n{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .l{font-size:10.5px;color:var(--mut)}
 .kpi .l.disp{letter-spacing:.07em}
-.kpi.k-review .n{color:var(--review)} .kpi.k-changes .n{color:var(--changes)}
-.kpi.k-appr .n{color:var(--appr)} .kpi.k-merge .n{color:var(--merge)} .kpi.k-block .n{color:var(--blocked)}
+.kpi.k-1000x .n{color:var(--review)} .kpi.k-dev .n{color:var(--merge)}
+.kpi.k-ready .n{color:var(--ready)} .kpi.k-prod .n{color:var(--appr)} .kpi.k-block .n{color:var(--blocked)}
 
 /* controls */
 .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
@@ -69,12 +73,12 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .hint{font-size:11.5px;color:var(--mut)}
 
 /* pipeline */
-.board{display:grid;grid-template-columns:repeat(6,minmax(178px,1fr));gap:10px;align-items:start;overflow-x:auto;padding-bottom:6px}
+.board{display:grid;grid-template-columns:repeat(7,minmax(166px,1fr));gap:9px;align-items:start;overflow-x:auto;padding-bottom:6px}
 .col{background:var(--panel2);border:1px solid var(--line);border-radius:9px;min-width:178px}
 .col h2{margin:0;padding:9px 11px 7px;font-size:11.5px;font-weight:700;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
 .col h2 .cnt{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
-.col-review h2{color:var(--review)} .col-changes h2{color:var(--changes)}
-.col-appr h2{color:var(--appr)} .col-merge h2{color:var(--merge)}
+.col-in1000x h2{color:var(--review)} .col-changes h2{color:var(--changes)}
+.col-dev h2{color:var(--merge)} .col-readyprod h2{color:var(--ready)} .col-prod h2{color:var(--appr)}
 .col-draft h2,.col-closed h2{color:var(--mut)}
 .cards{padding:8px;display:flex;flex-direction:column;gap:7px;max-height:60vh;overflow-y:auto}
 .card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--draft);border-radius:7px;padding:8px 9px;text-align:left;width:100%;transition:transform .14s,border-color .14s;animation:pop .35s both}
@@ -82,8 +86,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .card:focus-visible,.kpi:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 @keyframes pop{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.card{animation:none}}
-.card.s-review{border-left-color:var(--review)} .card.s-changes{border-left-color:var(--changes)}
-.card.s-approved{border-left-color:var(--appr)} .card.s-merged{border-left-color:var(--merge)}
+.card.s-in1000x{border-left-color:var(--review)} .card.s-changes{border-left-color:var(--changes)}
+.card.s-dev{border-left-color:var(--merge)} .card.s-readyprod{border-left-color:var(--ready)} .card.s-prod{border-left-color:var(--appr)}
 .card.s-closed{border-left-color:var(--closed);opacity:.75}
 .card.blocked{box-shadow:inset 0 0 0 1px var(--blocked)}
 .card .id{font-size:11.5px;color:var(--mut);display:flex;gap:6px;align-items:center;justify-content:space-between}
@@ -222,8 +226,9 @@ svg.wires{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index
 .dbody{overflow-y:auto;padding:14px 20px 40px;flex:1}
 .pill{display:inline-block;font-size:11px;font-weight:650;padding:2px 10px;border-radius:99px}
 .p-draft{background:var(--closed-bg);color:var(--draft)} .p-review{background:var(--review-bg);color:var(--review)}
-.p-changes{background:var(--changes-bg);color:var(--changes)} .p-approved{background:var(--appr-bg);color:var(--appr)}
-.p-merged{background:var(--merge-bg);color:var(--merge)} .p-closed{background:var(--closed-bg);color:var(--closed)}
+.p-in1000x{background:var(--review-bg);color:var(--review)} .p-changes{background:var(--changes-bg);color:var(--changes)}
+.p-dev{background:var(--merge-bg);color:var(--merge)} .p-readyprod{background:var(--ready-bg);color:var(--ready)}
+.p-prod{background:var(--appr-bg);color:var(--appr)} .p-closed{background:var(--closed-bg);color:var(--closed)}
 .meta{font-size:12px;color:var(--mut);margin-top:2px}
 .callout{border:1px solid var(--line);border-left:3px solid var(--review);background:var(--panel2);border-radius:6px;padding:9px 12px;font-size:13px;margin:12px 0}
 .callout.block{border-left-color:var(--blocked)}
@@ -318,7 +323,7 @@ svg.wires{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index
     <div id="qTree"></div>
   </div>
 
-  <p class="foot">Merging is a human's call — the reviewer reviews and approves only. Merged to <code>main</code> lands on <b>dev</b>; prod promotion is a manually-triggered build (asked for in the channel), so it isn't derivable from GitHub and is not shown as automatic. GitHub / Linear data is a snapshot from the last sync; Slack threads in the detail panel are live via your Slack connector. Deploy-order blockers come from what was actually said in the channel (e.g. "merge backend first or the page 404s").</p>
+  <p class="foot">Lifecycle: <b>In review</b> → <b>On dev</b> (Linear <i>In Review</i>) → <b>Ready for prod</b> (merged to <code>main</code>, awaiting the manual prod build) → <b>On prod</b> (Linear <i>Done</i>). Deploy stage is read from Linear; merging and the prod build are human-triggered, never inferred as automatic. The reviewer reviews and approves only — it never merges. GitHub / Linear data is a snapshot from the last sync (use <b>⟳ Refresh</b>); Slack threads in the detail panel are live. Deploy-order blockers come from what was actually said in the channel.</p>
 </div>
 
 <div class="ovl" id="ovl"></div>
@@ -361,8 +366,8 @@ const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;'
   ].filter(Boolean).join(' · ');
 }
 const EMO = {white_check_mark:'✅',red_circle:'🔴',large_orange_circle:'🟠',large_yellow_circle:'🟡',large_green_circle:'🟢',large_blue_circle:'🔵',books:'📚',sparkles:'✨',rocket:'🚀',warning:'⚠️'};
-const STATUS_LABEL = {draft:'Draft', review:'In review', changes:'Changes requested', approved:'Approved — awaiting merge', merged:'Merged → dev', closed:'Closed (unmerged)'};
-const COLS = [['draft','Draft'],['review','In review'],['changes','Changes req.'],['approved','Approved · to merge'],['merged','Merged → dev'],['closed','Closed']];
+const STATUS_LABEL = {draft:'Draft', in1000x:`In ${(META&&META.reviewer)||'review'}`, changes:'Changes requested', dev:'On dev', readyprod:'Ready for prod', prod:'On prod', closed:'Closed (unmerged)'};
+const COLS = [['draft','Draft'],['in1000x',`In ${(META&&META.reviewer)||'review'}`],['changes','Changes req.'],['dev','On dev'],['readyprod','Ready for prod'],['prod','On prod'],['closed','Closed']];
 
 const state = {view:'pipeline', q:'', repo:'', scope:'active', kpi:null};
 const ACTIVE_CUT = SNAP - 9*864e5;
@@ -382,12 +387,11 @@ function visible(){
     const k = state.kpi;
     v = v.filter(p =>
       k==='open' ? p.state==='OPEN' :
-      k==='awaitReview' ? p.status==='review' && p.slack.length>0 && p.state==='OPEN' :
-      k==='unposted' ? p.status==='review' && !p.slack.length && p.state==='OPEN' :
-      k==='changes' ? p.status==='changes' :
-      k==='approved' ? p.status==='approved' :
-      k==='blockedK' ? blocked(p) :
-      k==='merged7' ? (p.mergedAt && new Date(p.mergedAt).getTime() >= SNAP-7*864e5) : true);
+      k==='in1000x' ? (p.status==='in1000x'||p.status==='changes') && p.state==='OPEN' :
+      k==='dev' ? p.status==='dev' :
+      k==='readyprod' ? p.status==='readyprod' :
+      k==='prod7' ? (p.status==='prod' && p.mergedAt && new Date(p.mergedAt).getTime() >= SNAP-7*864e5) :
+      k==='blockedK' ? blocked(p) : true);
   }
   return v;
 }
@@ -397,12 +401,11 @@ function renderKPIs(){
   const open = PRS.filter(p=>p.state==='OPEN');
   const defs = [
     ['open','', open.length,'Open PRs'],
-    ['awaitReview','k-review', open.filter(p=>p.status==='review'&&p.slack.length).length,'Awaiting review'],
-    ['unposted','', open.filter(p=>p.status==='review'&&!p.slack.length).length,'Not yet posted to channel'],
-    ['changes','k-changes', open.filter(p=>p.status==='changes').length,'Changes requested'],
-    ['approved','k-appr', open.filter(p=>p.status==='approved').length,'Approved · human merge'],
+    ['in1000x','k-1000x', open.filter(p=>p.status==='in1000x'||p.status==='changes').length,`In ${esc(META.reviewer||'review')} · review`],
+    ['dev','k-dev', PRS.filter(p=>p.status==='dev').length,'On dev'],
+    ['readyprod','k-ready', PRS.filter(p=>p.status==='readyprod').length,'Ready for prod'],
+    ['prod7','k-prod', PRS.filter(p=>p.status==='prod'&&p.mergedAt&&new Date(p.mergedAt).getTime()>=SNAP-7*864e5).length,'On prod · 7d'],
     ['blockedK','k-block', PRS.filter(blocked).length,'Blocked by deploy order'],
-    ['merged7','k-merge', PRS.filter(p=>p.mergedAt&&new Date(p.mergedAt).getTime()>=SNAP-7*864e5).length,'Merged → dev · 7d'],
   ];
   $('#kpis').innerHTML = defs.map(([k,cls,n,l]) =>
     `<button class="kpi ${cls} ${state.kpi===k?'on':''}" data-k="${k}"><div class="n">${n}</div><div class="l disp">${l}</div></button>`).join('');
@@ -416,7 +419,7 @@ function cardHTML(p, i){
   if(p.tickets.length) b.push(`<span class="bdg lin">${p.tickets.map(t=>t.id).slice(0,2).join(' ')}</span>`);
   if(p.sessions.length) b.push(`<span class="bdg chat">▣ local chat</span>`);
   if(p.deps.length) b.push(`<span class="bdg dep">⛓ ${p.deps[0].kind==='order'?'ordered':'companion'}</span>`);
-  const wait = p.state==='OPEN' && p.waitingOn ? `<div class="wait ${blocked(p)?'block':''}">${esc(p.waitingOn)}</div>` : '';
+  const wait = p.waitingOn && p.status!=='closed' ? `<div class="wait ${blocked(p)?'block':''}">${esc(p.waitingOn)}</div>` : '';
   return `<button class="card s-${p.status} ${blocked(p)?'blocked':''}" data-id="${esc(p.id)}" style="animation-delay:${Math.min(i*22,700)}ms">
     <div class="id mono"><span>${esc(p.repo.replace(ORGP,''))}#${p.number}</span><span>${p.updatedAt?rel(p.updatedAt):''}</span></div>
     <div class="t">${esc(p.title)}</div><div class="badges">${b.join('')}</div>${wait}</button>`;
@@ -437,9 +440,9 @@ function segsFor(p){
   const c = Math.max(new Date(p.createdAt).getTime(), T0);
   const firstAsk = p.slack.length ? new Date(p.slack[0].when.length>10?p.slack[0].when:p.slack[0].when+'T12:00:00Z').getTime() : null;
   const end = p.mergedAt ? new Date(p.mergedAt).getTime() : (p.state==='CLOSED'? new Date(p.updatedAt).getTime() : SNAP);
-  const col = p.status==='merged' ? 'var(--merge)' : p.status==='closed' ? 'var(--closed)' :
-              p.status==='approved' ? 'var(--appr)' : p.status==='changes' ? 'var(--changes)' :
-              p.slack.length ? 'var(--review)' : 'var(--draft)';
+  const col = p.status==='prod' ? 'var(--appr)' : p.status==='readyprod' ? 'var(--ready)' :
+              p.status==='dev' ? 'var(--merge)' : p.status==='closed' ? 'var(--closed)' :
+              p.status==='changes' ? 'var(--changes)' : p.slack.length ? 'var(--review)' : 'var(--draft)';
   const segs = [];
   if(firstAsk && firstAsk > c && firstAsk < end){
     segs.push({a:c, b:firstAsk, col:'var(--draft)'});
@@ -548,7 +551,8 @@ function fmtSlack(t){
   return s.split(/\n\n+/).map(p=>`<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
 }
 function ticketChip(t){
-  const cls = t.statusType==='completed'?'p-merged':t.statusType==='started'?'p-review':'p-closed';
+  const _s=(t.status||'').toLowerCase();
+  const cls = t.statusType==='completed'?'p-prod':(_s.indexOf('ready')>=0&&_s.indexOf('prod')>=0)?'p-readyprod':_s==='in review'?'p-dev':t.statusType==='started'?'p-in1000x':'p-closed';
   return `<a class="chip" href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.id)}</b>${t.status?`<span class="st pill ${cls}">${esc(t.status)}</span>`:''}${t.ticketTitle?`<span style="color:var(--mut)">${esc(t.ticketTitle.slice(0,42))}${t.ticketTitle.length>42?'…':''}</span>`:''}</a>`;
 }
 function openDrawer(id){
@@ -562,8 +566,8 @@ function openDrawer(id){
   $('#xd').onclick = closeDrawer;
 
   let h = '';
-  if(p.state==='OPEN' && p.waitingOn)
-    h += `<div class="callout ${blocked(p)?'block':p.status==='approved'?'ok':''}"><b>Waiting on:</b> ${esc(p.waitingOn)}</div>`;
+  if(p.waitingOn && p.status!=='closed')
+    h += `<div class="callout ${blocked(p)?'block':(p.status==='prod'||p.status==='readyprod'||p.reviewDecision==='APPROVED')?'ok':''}"><b>Waiting on:</b> ${esc(p.waitingOn)}</div>`;
 
   if(p.deps.length){
     h += `<div class="sec"><h4 class="disp">Ship order / companions</h4>`;
